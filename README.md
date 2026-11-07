@@ -12,7 +12,7 @@ Sampler e sequenciador de bolso inspirado no Pocket Operator PO-33. É um único
 - Visual de ferrofluido em WebGL, que reage a pads, BPM, volume, afinação, filtro e efeitos.
 - Interface sem funções escondidas, que se ajusta à altura da tela (celular, dobrável, tablet).
 
-Padrões e sons ficam salvos no navegador (IndexedDB).
+Padrões e sons ficam salvos no navegador (IndexedDB). No menu (⋯), **Exportar backup** gera um arquivo `.json` com todos os sons e padrões (no iPhone abre a folha de compartilhar, para salvar em Arquivos), e **Importar backup** restaura esse arquivo, substituindo tudo.
 
 ## Instalar como PWA
 
