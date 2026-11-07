@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Bolso-16 · sampler de bolso</title>
+<meta name="theme-color" content="#f1f0ec">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bolso-16">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f1f0ec;--panel:#fafaf8;--tile:#e8e7e3;--tile2:#dedcd7;--ink:#1c1c1e;--mut:#8a8984;--red:#e5443a;--px:"Silkscreen",ui-monospace,Menlo,monospace;--g:clamp(5px,1dvh,9px)}
@@ -708,7 +716,7 @@ function buildUI(){
   $('mReset').onclick=()=>{if(needConf('reset')){$('mReset').textContent='Toque de novo para confirmar';return}
     if(playing)stopPlay();factory();S.vis=true;setVis(true);$('menu').classList.add('hidden');flash('FÁBRICA RESTAURADA')};
   window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();ensureCtx();playing?stopPlay():startPlay()}});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='sample'){closeMic();setMode('play')}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='sample'){closeMic();setMode('play')}if(!document.hidden&&ctx&&ctx.state!=='running')ctx.resume().catch(()=>{})});
   window.addEventListener('blur',()=>{for(let k=0;k<16;k++)if(pressed[k]){pressed[k]=false;padUp(k)}});
 }
 
@@ -763,6 +771,8 @@ function frame(){requestAnimationFrame(frame);if(!S)return;micTick();
 /* ===================== INÍCIO ===================== */
 (async function init(){
   buildUI();
+  try{if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   let ok=false;
   try{const st=await idb.get('state'),sm=await idb.get('samples');if(st&&st.v===1&&Array.isArray(sm)&&st.patterns&&st.patterns.length===16){S=st;samples=sm;ok=true}}catch(e){}
   if(!ok)factory();
