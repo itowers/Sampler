@@ -14,9 +14,16 @@ Sampler e sequenciador de bolso inspirado no Pocket Operator PO-33. É um único
 
 Padrões e sons ficam salvos no navegador (IndexedDB).
 
+## Instalar como PWA
+
+Abra o endereço do GitHub Pages no Safari (iPhone) ou no Chrome (Android) e use "Adicionar à Tela de Início". O app abre em tela cheia e funciona offline depois da primeira abertura. Para atualizar, abra o app online e feche e abra de novo (ou aumente `VERSION` em `sw.js`).
+
+No iPhone, sons e padrões do app instalado ficam separados dos que você salvou no Safari.
+
 ## Estrutura
 
 - `index.html`: o app inteiro (áudio, sequenciador, visual, interface).
+- `manifest.webmanifest`, `sw.js`, `icons/`: instalação como PWA e uso offline.
 - `docs/prompt-sequenciador.md`: prompt para levar o modelo de gravar, tocar e sequenciar a outro synth.
 
 ## Limitações
