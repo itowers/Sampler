@@ -8,7 +8,7 @@ Sampler e sequenciador de bolso inspirado no Pocket Operator PO-33. É um único
 - Sequenciador de 16 passos, 16 padrões, cadeia de até 128 padrões, swing e TAP.
 - Gravação por passos e ao vivo (quantizada), com travas de parâmetro por passo.
 - 15 efeitos (loops, uníssono, oitavas, stutter, scratch, 6/8, retrigger, reverso), ao vivo ou gravados no padrão.
-- Gravação de amostras por microfone ou carregando arquivo de áudio. Memória de 40 s.
+- Gravação de amostras pelo microfone (modo Gravar: segure um pad) ou carregando arquivo de áudio. Memória de 40 s.
 - Visual de ferrofluido em WebGL, que reage a pads, BPM, volume, afinação, filtro e efeitos.
 - Interface sem funções escondidas, que se ajusta à altura da tela (celular, dobrável, tablet).
 
@@ -22,4 +22,4 @@ Padrões e sons ficam salvos no navegador (IndexedDB).
 ## Limitações
 
 - Não replica o que depende do hardware do PO-33: relógio, alarme, bateria, sincronização por cabo e backup por áudio.
-- Dentro do claude.ai o microfone é bloqueado; fora dele a gravação por microfone funciona.
+- O microfone exige HTTPS (ou `localhost`) e a permissão do navegador. Dentro do claude.ai ele é bloqueado, e o app cai para o seletor de arquivo.

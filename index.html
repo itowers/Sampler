@@ -174,7 +174,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <tr><td>Padrão</td><td>escolhe um dos 16 padrões · copiar para · limpar</td></tr>
  <tr><td>Cadeia</td><td>toque padrões em ordem para encadear (até 128)</td></tr>
  <tr><td>FX</td><td>16 efeitos. Segurar = enquanto o pad está pressionado · Travar = liga/desliga · Gravar no padrão = salva o efeito nos passos</td></tr>
- <tr><td>Gravar</td><td>segure um pad para gravar uma amostra. Aqui no Claude o microfone é bloqueado, então abre o seletor de arquivo</td></tr>
+ <tr><td>Gravar</td><td>ao entrar no modo, o navegador pede o microfone. Com o mic pronto, segure um pad enquanto faz o som e solte para terminar. Se o mic estiver bloqueado (por exemplo dentro do claude.ai), o pad abre o seletor de arquivo de áudio</td></tr>
  <tr><td>Volume</td><td>volume geral 1–16</td></tr>
  </table>
  <h3>Parâmetros</h3>
@@ -410,24 +410,47 @@ function processRec(d){let s=0;while(s<d.length&&Math.abs(d[s])<.02)s++;s=Math.m
   const no=Math.min(d.length,Math.round(ctx.sampleRate*.005));for(let i=0;i<no;i++)d[d.length-1-i]*=i/no;return d}
 
 /* --- gravação: microfone se permitido, senão arquivo --- */
-let mic=null,proc=null,recChunks=null,recSlot=-1,recLen=0,recMax=0,micBlocked=false,fileTarget=-1;
-function micAllowed(){try{const fp=document.permissionsPolicy||document.featurePolicy;if(fp&&fp.allowsFeature&&!fp.allowsFeature('microphone'))return false}catch(e){}return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)}
+let mic=null,proc=null,micStream=null,micAn=null,micBuf=null,micState='off',micLevel=0,recChunks=null,recSlot=-1,recLen=0,recMax=0,fileTarget=-1;
+function micAllowed(){try{const fp=document.permissionsPolicy||document.featurePolicy;if(fp&&fp.allowsFeature&&!fp.allowsFeature('microphone'))return false}catch(e){}return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)&&window.isSecureContext!==false}
 function openFile(slot){fileTarget=slot;const f=document.getElementById('fileIn');f.value='';f.click()}
+/* O microfone abre ao entrar no modo Gravar (toque do usuário = pedido de permissão) e fecha ao sair. */
+async function openMic(){
+  if(micState==='ready'||micState==='asking')return;
+  ensureCtx();
+  if(!micAllowed()){micState='blocked';return}
+  micState='asking';
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+    if(mode!=='sample'){st.getTracks().forEach(t=>t.stop());micState='off';return}   // saiu do modo enquanto o aviso estava aberto
+    micStream=st;mic=ctx.createMediaStreamSource(st);
+    micAn=ctx.createAnalyser();micAn.fftSize=512;micBuf=new Float32Array(micAn.fftSize);mic.connect(micAn);
+    proc=ctx.createScriptProcessor(2048,1,1);const z=ctx.createGain();z.gain.value=0;mic.connect(proc);proc.connect(z);z.connect(ctx.destination);
+    proc.onaudioprocess=e=>{if(recSlot<0||!recChunks)return;const d=e.inputBuffer.getChannelData(0);if(recLen<recMax){recChunks.push(new Float32Array(d));recLen+=d.length}else stopSampling()};
+    st.getAudioTracks()[0].addEventListener('ended',()=>closeMic());
+    micState='ready';flash('MICROFONE PRONTO\nsegure um pad para gravar');
+  }catch(e){
+    micState=(e&&(e.name==='NotAllowedError'||e.name==='SecurityError'))?'denied':'blocked';
+    flash(micState==='denied'?'MIC NEGADO\nlibere nos ajustes do navegador':'MIC INDISPONÍVEL\nusando arquivo de áudio',2600);
+  }
+}
+function closeMic(){
+  if(recSlot>=0)stopSampling();
+  try{if(proc){proc.onaudioprocess=null;proc.disconnect()}if(mic)mic.disconnect();if(micStream)micStream.getTracks().forEach(t=>t.stop())}catch(e){}
+  mic=proc=micStream=micAn=micBuf=null;micLevel=0;if(micState==='ready'||micState==='asking')micState='off'}
+function micTick(){if(micAn&&micBuf){micAn.getFloatTimeDomainData(micBuf);let s=0;for(let i=0;i<micBuf.length;i++)s+=micBuf[i]*micBuf[i];const r=Math.min(1,Math.sqrt(s/micBuf.length)*4);micLevel+=(r-micLevel)*(r>micLevel?.6:.12)}}
+function micBars(){const n=Math.round(micLevel*10);return '▮'.repeat(n)+'▯'.repeat(10-n)}
 async function startSampling(k){
   const free=MEM-usedMem(k);
   if(free<.1){flash('MEMÓRIA CHEIA\napague um som');return}
-  if(micBlocked||!micAllowed()){micBlocked=true;flash(`MIC INDISPONÍVEL\narquivo p/ som ${pad(k+1)}`,2200);openFile(k);return}
-  recSlot=k;recChunks=[];recLen=0;recMax=free*ctx.sampleRate;
-  try{
-    if(!mic){const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-      mic=ctx.createMediaStreamSource(st);proc=ctx.createScriptProcessor(2048,1,1);const z=ctx.createGain();z.gain.value=0;mic.connect(proc);proc.connect(z);z.connect(ctx.destination);
-      proc.onaudioprocess=e=>{if(recSlot<0||!recChunks)return;const d=e.inputBuffer.getChannelData(0);if(recLen<recMax){recChunks.push(new Float32Array(d));recLen+=d.length}else stopSampling()}}
-  }catch(e){micBlocked=true;recSlot=-1;recChunks=null;flash('MIC BLOQUEADO\ntoque o pad de novo: arquivo',2200)}
+  if(micState==='ready'){recSlot=k;recChunks=[];recLen=0;recMax=free*ctx.sampleRate;return}
+  if(micState==='asking'){flash('ACEITE A PERMISSÃO DO MIC');return}
+  if(micState==='off'){openMic();flash('ABRINDO MIC\ntoque de novo para gravar');return}
+  flash(`SEM MIC · ESCOLHA UM ARQUIVO\npara o som ${pad(k+1)}`,2200);openFile(k)   // 'blocked' ou 'denied'
 }
 function stopSampling(){if(recSlot<0)return;const k=recSlot;recSlot=-1;const ch=recChunks;recChunks=null;
   if(!ch||recLen<ctx.sampleRate*.05){flash('GRAVAÇÃO CURTA DEMAIS');return}
   const d=new Float32Array(recLen);let o=0;for(const c of ch){d.set(c.subarray(0,Math.min(c.length,recLen-o)),o);o+=c.length;if(o>=recLen)break}
-  setSample(k,processRec(d),ctx.sampleRate,'amostra');flash(`SOM ${pad(k+1)} GRAVADO · ${(recLen/ctx.sampleRate).toFixed(1)}s`)}
+  setSample(k,processRec(d),ctx.sampleRate,'amostra');S.curSound=k;flash(`SOM ${pad(k+1)} GRAVADO · ${(recLen/ctx.sampleRate).toFixed(1)}s`)}
 document.getElementById('fileIn').addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f||fileTarget<0)return;ensureCtx();const slot=fileTarget;
   try{const ab=await f.arrayBuffer();const b=await new Promise((res,rej)=>{const p=ctx.decodeAudioData(ab,res,rej);if(p&&p.catch)p.catch(rej)});
@@ -592,7 +615,7 @@ function fmt(key,v){
   if(key==='f')return v<.47?`LP ${Math.round((1-v/.47)*100)}`:v>.53?`HP ${Math.round((v-.53)/.47*100)}`:'aberto';
   return `${Math.round(v*100)}`}
 
-function setMode(m){mode=m;copyArm=null;if(m==='chain')chainBuild=[];if(m!=='fx'&&!fxLatch)heldFx=-1}
+function setMode(m){const prev=mode;mode=m;if(m==='sample')openMic();else if(prev==='sample')closeMic();copyArm=null;if(m==='chain')chainBuild=[];if(m!=='fx'&&!fxLatch)heldFx=-1}
 function setVis(on){S.vis=on;$('gl').style.visibility=on?'visible':'hidden';if(on)glInit();dirty()}
 
 /* --- pads --- */
@@ -650,7 +673,7 @@ function ctxHTML(){const cs=S.curSound,sl=S.slots[cs];
     case 'pattern':return B('copyP',copyArm==='pattern'?'toque o destino':'copiar para…',copyArm==='pattern'?'on':'')+B('clrPat',conf('clrPat','limpar padrão'));
     case 'chain':return T(chainBuild.length?chainBuild.map(x=>x+1).join('›'):'toque os padrões em ordem')+B('chUndo','desfazer')+B('chNew','nova');
     case 'fx':return B('fxHold','segurar',fxLatch?'':'on')+B('fxLatch','travar',fxLatch?'on':'')+B('fxRec','gravar no padrão',fxRec?'on':'')+B('fxClr',conf('fxClr','apagar'));
-    case 'sample':return T(micBlocked||!micAllowed()?`toque um pad: arquivo · livre ${(MEM-usedMem()).toFixed(1)}s`:`segure um pad p/ gravar · livre ${(MEM-usedMem()).toFixed(1)}s`)+B('del',conf('del','apagar som atual'));
+    case 'sample':{const t=micState==='ready'?'mic pronto · segure um pad':micState==='asking'?'aceite a permissão do mic':micState==='denied'?'mic negado · pad abre arquivo':micState==='blocked'?'sem mic · pad abre arquivo':'abrindo microfone…';return T(t)+B('del',conf('del','apagar som atual'))}
     case 'vol':return T(`volume geral ${S.vol}/16${S.vol>10?' · cuidado com fones':''}`);
   }return ''}
 
@@ -685,6 +708,7 @@ function buildUI(){
   $('mReset').onclick=()=>{if(needConf('reset')){$('mReset').textContent='Toque de novo para confirmar';return}
     if(playing)stopPlay();factory();S.vis=true;setVis(true);$('menu').classList.add('hidden');flash('FÁBRICA RESTAURADA')};
   window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();ensureCtx();playing?stopPlay():startPlay()}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='sample'){closeMic();setMode('play')}});
   window.addEventListener('blur',()=>{for(let k=0;k<16;k++)if(pressed[k]){pressed[k]=false;padUp(k)}});
 }
 
@@ -699,6 +723,7 @@ function render(){
   setTxt($('dSub'),`${ml} · PASSO ${vs>=0?vs+1:'-'}/16 · ${playing?'TOCANDO':'PARADO'}${liveRecOn?' · REC':''}${lockOn?' · TRAVA':''}`);
   let m;
   if(recSlot>=0&&ctx)m=`● GRAVANDO SOM ${pad(recSlot+1)} ${(recLen/ctx.sampleRate).toFixed(1)}S`;
+  else if(mode==='sample'&&micState==='ready'&&msg.until<=now)m=`MIC ${micBars()}`;
   else if(msg.until>now)m=msg.t.replace(/\n/g,' · ');
   else{const P=PAGES[page];m=`${P.n} · ${P.l[0].toUpperCase()} ${fmt(P.k[0],getKnob(0))} · ${P.l[1].toUpperCase()} ${fmt(P.k[1],getKnob(1))}`}
   setTxt($('dMsg'),m.toUpperCase());
@@ -731,7 +756,7 @@ function render(){
     if(pressed[k])c+=' down';
     setCls(o.el,c);setTxt(o.lab,lab);setTxt(o.num,num)}
 }
-function frame(){requestAnimationFrame(frame);if(!S)return;
+function frame(){requestAnimationFrame(frame);if(!S)return;micTick();
   if(ctx&&playing){const now=ctx.currentTime;while(sched.length>1&&sched[1].time<=now)sched.shift();visCur=sched.length&&sched[0].time<=now?sched[0]:null}else visCur=null;
   render();visFrame()}
 
