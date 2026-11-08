@@ -6,11 +6,15 @@ Sampler e sequenciador de bolso inspirado no Pocket Operator PO-33. É um único
 
 - 16 sons: 1–8 melódicos (escala), 9–16 bateria (16 fatias). Vem com sons e kits sintetizados pelo próprio app.
 - Sequenciador de 16 passos, 16 padrões, cadeia de até 128 padrões, swing e TAP.
-- Gravação por passos e ao vivo (quantizada), com travas de parâmetro por passo.
+- Gravação por passos e ao vivo (quantizada), com travas de parâmetro por passo. REC parado faz contagem de 1 compasso; cada volta soma notas (overdub) e dá para desfazer volta a volta. Repetição de nota (1/8, 1/16, 1/32) e borracha.
+- Metrônomo (desligado, só gravando ou sempre), com volume e contagem no menu.
+- Padrões de 8, 16, 32 ou 64 passos, com páginas e visão geral no visor. Esticar duplica; encurtar não apaga.
+- Camadas: todos os sons do padrão sobrepostos numa grade, com mute e solo por som.
+- Perf: looper de 4 faixas de notas com ações quantizadas no compasso, overdub com feedback, desfazer/refazer, ×2, ½, salvar como padrão e reamostrar para áudio.
 - 15 efeitos (loops, uníssono, oitavas, stutter, scratch, 6/8, retrigger, reverso), ao vivo ou gravados no padrão.
 - Gravação de amostras pelo microfone (modo Gravar: segure um pad) ou carregando arquivo de áudio. Memória de 40 s.
 - Visual de ferrofluido em WebGL, que reage a pads, BPM, volume, afinação, filtro e efeitos.
-- Interface sem funções escondidas, que se ajusta à altura da tela (celular, dobrável, tablet).
+- Interface clara com teclas em relevo, sem funções escondidas, que se ajusta à altura da tela (celular, dobrável, tablet).
 
 Padrões e sons ficam salvos no navegador (IndexedDB). No menu (⋯), **Exportar backup** gera um arquivo `.json` com todos os sons e padrões (no iPhone abre a folha de compartilhar, para salvar em Arquivos), e **Importar backup** restaura esse arquivo, substituindo tudo.
 
