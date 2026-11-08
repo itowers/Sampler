@@ -278,7 +278,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <button class="mbtn" id="mImport">Carregar arquivo de áudio no som atual</button>
  <button class="mbtn" id="mExport">Exportar backup (sons e padrões)</button>
  <button class="mbtn" id="mImportB">Importar backup</button>
- <button class="mbtn" id="mDemo">Recarregar demo no padrão 1</button>
+ <button class="mbtn" id="mDemo">Carregar beat de exemplo no padrão 1</button>
  <button class="mbtn warn" id="mReset">Restaurar fábrica (apaga tudo)</button>
  <p class="note" id="mInfo"></p>
 </div></div>
@@ -324,6 +324,8 @@ function migrate(s){
   if(s.met===undefined)s.met=1;if(s.metVol===undefined)s.metVol=6;if(s.countIn===undefined)s.countIn=true;
   if(!(s.rept>=0&&s.rept<4))s.rept=0;if(s.page===undefined)s.page=0;if(s.follow===undefined)s.follow=true;
   if(s.layAll===undefined)s.layAll=false;s.layFull=false;if(s.layView===undefined)s.layView=false;
+  if(!s.noDemo){s.noDemo=true;const d=demoPattern(),p=s.patterns[0];
+    if(p&&JSON.stringify(p.n.map(r=>r.slice(0,16)))===JSON.stringify(d.n.map(r=>r.slice(0,16)))&&!p.n.some(r=>r.slice(16).some(x=>x.length))){const L=p.len;s.patterns[0]=newPattern();s.patterns[0].len=L}}
   if(!s.perf||!Array.isArray(s.perf.tracks)||s.perf.tracks.length!==4)s.perf=newPerf();
   s.perf.tracks.forEach((t,i)=>{const d=newTrack();for(const k in d)if(t[k]===undefined)t[k]=d[k];if(t.st==='rec')s.perf.tracks[i]=Object.assign(newTrack(),{fb:t.fb});else if(t.st==='ovd')t.st='play';t.pass=null;t.touched=false});
   return s}
@@ -390,7 +392,6 @@ function factory(){
   S=defaultState();
   samples=factorySamples();
   FNAMES.forEach((n,i)=>S.slots[i].name=samples[i]?n:'');
-  S.patterns[0]=demoPattern();
   bufC.fill(null);revC.fill(null);
   save(true);
 }
@@ -1022,7 +1023,7 @@ function buildUI(){
   $('mExport').onclick=()=>{$('menu').classList.add('hidden');exportBackup()};
   $('mImportB').onclick=()=>{if(needConf('imp')){$('mImportB').textContent='Isso substitui tudo. Toque de novo para escolher o arquivo';return}$('mImportB').textContent='Importar backup';$('bkIn').value='';$('bkIn').click()};
   $('bkIn').addEventListener('change',e=>{const f=e.target.files[0];$('menu').classList.add('hidden');if(f)importBackup(f)});
-  $('mDemo').onclick=()=>{S.patterns[0]=demoPattern();dirty();$('menu').classList.add('hidden');flash('DEMO NO PADRÃO 01')};
+  $('mDemo').onclick=()=>{S.patterns[0]=demoPattern();dirty();$('menu').classList.add('hidden');flash('EXEMPLO NO PADRÃO 01')};
   $('mReset').onclick=()=>{if(needConf('reset')){$('mReset').textContent='Toque de novo para confirmar';return}
     if(playing)stopPlay();factory();undoSt=[];perfPend=[];S.vis=true;setVis(true);$('menu').classList.add('hidden');flash('FÁBRICA RESTAURADA')};
   window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();ensureCtx();playing?stopPlay():startPlay(liveRecOn&&S.countIn)}});
@@ -1139,7 +1140,7 @@ function frame(){requestAnimationFrame(frame);if(!S)return;micTick();
   if(!ok)factory();
   if(S.vis===undefined)S.vis=true;
   setVis(S.vis);
-  flash('▶ PLAY PARA OUVIR A DEMO · ? = AJUDA',3500);
+  flash('● REC PARA GRAVAR · ⋯ = MENU E AJUDA',3500);
   requestAnimationFrame(frame);
 })();
 
