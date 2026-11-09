@@ -43,13 +43,14 @@ function onsets(buf,thr=.02,gap=.04){const d=buf.getChannelData(0),r=buf.sampleR
 /* som de clique: 16 fatias de 0,2 s, cada uma com um tom de 30 ms no início */
 function clickKit(rate=44100){const n=Math.round(.2*rate),d=new Float32Array(n*16);
   for(let s=0;s<16;s++)for(let i=0;i<Math.round(.03*rate);i++)d[s*n+i]=(i%40<20?.8:-.8);return d}
-function reset(){E(`factory();heldFx=-1;fxRec=false;page=0;S.swing=0;S.bpm=120;S.chain=[0];S.curPattern=0;pendingChain=null;undoSt=[];perfPend=[];S.perf=newPerf();`)}
-function useClicks(slot=8){A.__ck=clickKit();E(`samples[${slot}]={data:window.__ck,rate:44100};invalidate(${slot});S.slots[${slot}]=newSlot('clique')`)}
+function reset(){E(`factory();heldFx=-1;fxRec=false;page=0;S.swing=0;S.bpm=120;S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;pendingChain=null;undoSt=[];perfPend=[];S.perf=newPerf();S.loops=newLoops();DEV=DEVDEF();
+  globalThis.TL=(p,s,i,o)=>{const x=stpMk(p,s,i);for(const q in o){if(RICH.includes(q))x[q]=o[q];else (x.l||(x.l={}))[q]=o[q]}};`)}
+function useClicks(slot=8){A.__ck=clickKit();E(`samples[${slot}]={data:window.__ck,rate:44100};invalidate(${slot});S.instr[${slot}]=newSlot('clique')`)}
 function goldenSetup(){reset();E(`S.bpm=120;S.swing=30;S.vol=8;
-  const p=newPattern();p.len=16;const k=(s,st,key)=>p.n[s][st].push(key);
+  const p=newPattern();p.len=16;const k=(s,st,key)=>addK(p,s,st,key);
   [0,4,8,12].forEach(i=>k(8,i,0));[4,12].forEach(i=>k(8,i,2));for(let i=0;i<16;i+=2)k(8,i,5);k(8,7,5);k(8,15,7);
-  [0,3,6,8,10,11,14].forEach((i,j)=>k(0,i,[0,0,7,4,3,4,2][j]));p.lk[0][8]={f:.25,r:.4};
-  S.patterns[0]=p;S.chain=[0];S.curPattern=0;`)}
+  [0,3,6,8,10,11,14].forEach((i,j)=>k(0,i,[0,0,7,4,3,4,2][j]));TL(p,0,8,{f:.25,r:.4});
+  S.patterns[0]=p;S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;`)}
 /* impressão digital: RMS em blocos de 5 ms ×1000, arredondado. O render offline do Chrome varia ~1e-6 entre execuções,
    então um SHA exato do áudio não é estável; a impressão compara com tolerância de 2/1000. */
 function fingerprint(buf){const d=buf.getChannelData(0),B=Math.round(buf.sampleRate*.005),f=[];
@@ -71,7 +72,7 @@ T['9.1 impressão digital do áudio']=async()=>{const N='9.1 impressão digital 
   rec(N,md<=2,md<=2?`igual à referência (desvio máx ${md}/1000 RMS · sha ${h.slice(0,10)}…)`:`mudou: desvio ${md}/1000 RMS em ${(at*5)} ms`)};
 
 T['9.2 timing do sequenciador']=async()=>{
-  reset();useClicks();E(`S.swing=30;const p=newPattern();p.len=16;for(let i=0;i<16;i++)p.n[8][i].push(i%4);S.patterns[0]=p;`);
+  reset();useClicks();E(`S.swing=30;const p=newPattern();p.len=16;for(let i=0;i<16;i++)addK(p,8,i,i%4);S.patterns[0]=p;`);
   const r=await render({steps:16,dry:true}),dur=E('stepDur()'),sw=.3;
   const exp=[...Array(16)].map((_,i)=>r.t0+i*dur+(i%2?sw*dur*.5:0)),got=onsets(r.buf);
   if(got.length!==16)return rec('9.2 timing do sequenciador',false,`${got.length} ataques, esperava 16`);
@@ -79,7 +80,7 @@ T['9.2 timing do sequenciador']=async()=>{
   rec('9.2 timing do sequenciador',err<=.001,`erro máximo ${ms(err)} (limite 1 ms) · swing 30%`)};
 
 T['9.4 jitter do relógio']=async()=>{
-  reset();E(`ensureCtx();S.patterns[0]=demoPattern();S.chain=[0];S.curPattern=0;S.met=0;TST.tk=[];`);
+  reset();E(`ensureCtx();S.patterns[0]=demoPattern();S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;S.met=0;TST.tk=[];`);
   for(let i=0;i<50&&E('ctx.state')!=='running';i++)await sleep(100);
   if(E('ctx.state')!=='running')return rec('9.4 jitter do relógio',false,'o áudio não começou (toque na página e rode de novo)');
   const secs=FAST?5:30;E('startPlay(false)');await sleep(secs*1000);E('stopPlay()');
@@ -90,20 +91,20 @@ T['9.4 jitter do relógio']=async()=>{
   rec('9.4 jitter do relógio',maxErr<.0005&&late===0,`${secs}s · ${tk.length} passos · desvio máx ${ms(maxErr)} · menor antecedência ${ms(minLead)} · ${late} passos com < 10 ms`)};
 
 T['9.10 orçamento de CPU']=async()=>{
-  reset();E(`for(const i of [6,7]){samples[i]=samples[i-6];S.slots[i].name='cópia'}for(const i of [12,13,14,15]){samples[i]=samples[i-4];S.slots[i].slices=defSlices()}
+  reset();E(`for(const i of [6,7]){samples[i]=samples[i-6];S.instr[i].name='cópia'}for(const i of [12,13,14,15]){samples[i]=samples[i-4];S.instr[i].slices=defSlices()}
     for(let i=0;i<16;i++)invalidate(i);
-    const p=newPattern();p.len=64;for(let s=0;s<16;s++)for(let st=0;st<64;st++)if((st+s)%2===0)p.n[s][st].push((st+s)%8);
-    for(let st=0;st<64;st++)p.fx[st]=[-1,8,4,9,6,-1,10,14][st%8];
-    for(let st=0;st<64;st+=4)p.lk[3][st]={rat:3};for(let st=2;st<64;st+=8)p.mx[st]={dj:.2};
-    S.mix.dp=.7;S.mix.du=.5;S.mix.dj=.7;S.slots[0].ins={t:1,a:.5};S.slots[8].ins={t:2,a:.5};S.slots[2].ins={t:3,a:.5};
-    S.patterns[0]=p;S.chain=[0];S.curPattern=0;`);
+    const p=newPattern();p.len=64;for(let s=0;s<16;s++)for(let st=0;st<64;st++)if((st+s)%2===0)addK(p,s,st,(st+s)%8);
+    for(let st=0;st<64;st++){const f=[-1,8,4,9,6,-1,10,14][st%8];if(f>=0)fxSet(p,st,'fx',f)}
+    for(let st=0;st<64;st+=4)TL(p,3,st,{rat:3});for(let st=2;st<64;st+=8)fxSet(p,st,'dj',.2);
+    S.mix.dp=.7;S.mix.du=.5;S.mix.dj=.7;S.instr[0].ins={t:1,a:.5};S.instr[8].ins={t:2,a:.5};S.instr[2].ins={t:3,a:.5};
+    S.patterns[0]=p;S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;`);
   const t=performance.now(),r=await render({steps:128}),wall=(performance.now()-t)/1000,dur=r.buf.duration,pc=wall/dur*100;
   window.CPU={wall,dur,pc};
   rec('9.10 orçamento de CPU',pc<25,`8 compassos com 16 sons, ratchets, FX, DUCK, DJ, DUST e INSERTs: render ${wall.toFixed(2)}s para ${dur.toFixed(1)}s de áudio = ${pc.toFixed(1)}% (limite 25%)`)};
 
 T['9.3 polimetria']=async()=>{const N='9.3 polimetria';
-  reset();useClicks(8);useClicks(9);E(`const p=newPattern();p.len=64;p.n[8][0].push(0);p.sc[8].c=16;p.n[9][0].push(1);p.sc[9].c=12;
-    p.n[10][1].push(0);p.sc[10]={c:4,d:2};p.n[11][1].push(0);p.sc[11]={c:8,d:0};S.patterns[0]=p;S.chain=[0];
+  reset();useClicks(8);useClicks(9);E(`const p=newPattern();p.len=64;addK(p,8,0,0);p.tr[8].c=16;addK(p,9,0,1);p.tr[9].c=12;
+    addK(p,10,1,0);Object.assign(p.tr[10],{c:4,d:2});addK(p,11,1,0);Object.assign(p.tr[11],{c:8,d:0});S.patterns[0]=p;S.cenas=[];S.chain=chainOf([0]);
     samples[10]=samples[8];samples[11]=samples[8];invalidate(10);invalidate(11);`);
   const r=await render({steps:64,dry:true}),dur=E('stepDur()'),pos=e=>(e.t-r.t0)/dur;
   const A_=r.ev.filter(e=>e.s===8).map(pos),B_=r.ev.filter(e=>e.s===9).map(pos),C_=r.ev.filter(e=>e.s===10).map(pos),D_=r.ev.filter(e=>e.s===11).map(pos);
@@ -117,16 +118,16 @@ T['9.3 polimetria']=async()=>{const N='9.3 polimetria';
 
 T['9.5 ratchet, tie e condições']=async()=>{const N='9.5 ratchet, tie e condições',bad=[];
   // ratchet 3: 3 ataques no passo, volume caindo 10%
-  reset();useClicks();E(`const p=newPattern();p.len=16;p.n[8][0].push(0);p.lk[8][0]={rat:3};p.n[8][4].push(1);S.patterns[0]=p;`);
+  reset();useClicks();E(`const p=newPattern();p.len=16;addK(p,8,0,0);TL(p,8,0,{rat:3});addK(p,8,4,1);S.patterns[0]=p;`);
   let r=await render({steps:16,dry:true});const on=onsets(r.buf,.02,.008).filter(t=>t<r.t0+E('stepDur()')*.99);
   const g=r.ev.filter(e=>e.k===0).map(e=>e.gain);
   if(on.length!==3)bad.push(`ratchet: ${on.length} ataques`);if(!(g.length===3&&Math.abs(g[1]-.9)<1e-9&&Math.abs(g[2]-.81)<1e-9))bad.push('ratchet: volumes');
   // tie: passo com tie num som melódico não gera ataque
-  reset();E(`const p=newPattern();p.len=16;p.n[0][0].push(0);p.n[0][2].push(0);p.lk[0][2]={tie:true};p.n[0][4].push(2);S.patterns[0]=p;`);
+  reset();E(`const p=newPattern();p.len=16;addK(p,0,0,0);addK(p,0,2,0);TL(p,0,2,{tie:true});addK(p,0,4,2);S.patterns[0]=p;`);
   r=await render({steps:16,dry:true});const st0=r.ev.filter(e=>e.s===0).map(e=>Math.round((e.t-r.t0)/E('stepDur()')));
   if(JSON.stringify(st0)!=='[0,4]')bad.push(`tie: passos ${st0}`);
   // condições em 6 voltas
-  reset();E(`const p=newPattern();p.len=16;[1,2,3,5,6].forEach((c,i)=>{p.n[8][i].push(i);p.lk[8][i]={cd:c}});S.patterns[0]=p;fillOn=false;`);
+  reset();E(`const p=newPattern();p.len=16;[1,2,3,5,6].forEach((c,i)=>{addK(p,8,i,i);TL(p,8,i,{cd:c})});S.patterns[0]=p;fillOn=false;`);
   r=await render({steps:96,dry:true});const cyc=k=>r.ev.filter(e=>e.k===k).map(e=>Math.floor((e.t-r.t0)/(16*E('stepDur()')))+1);
   const J=x=>JSON.stringify(x);
   if(J(cyc(0))!=='[1,3,5]')bad.push(`1:2 tocou nas voltas ${cyc(0)}`);if(J(cyc(1))!=='[2,4,6]')bad.push(`2:2 tocou nas voltas ${cyc(1)}`);
@@ -134,23 +135,23 @@ T['9.5 ratchet, tie e condições']=async()=>{const N='9.5 ratchet, tie e condi�
   E('fillOn=true');r=await render({steps:32,dry:true});E('fillOn=false');
   if(r.ev.filter(e=>e.k===3).length!==2)bad.push('FILL não tocou com fill');if(r.ev.filter(e=>e.k===4).length)bad.push('!FILL tocou com fill');
   // 50%: o sorteio anotado na fila bate com o que soou
-  reset();E(`const p=newPattern();p.len=16;for(let i=0;i<16;i++){p.n[8][i].push(0);p.lk[8][i]={cd:4}}S.patterns[0]=p;`);
+  reset();E(`const p=newPattern();p.len=16;for(let i=0;i<16;i++){addK(p,8,i,0);TL(p,8,i,{cd:4})}S.patterns[0]=p;`);
   r=await render({steps:64,dry:true});const yes=r.steps.reduce((a,x)=>a+Object.values(x.dice).filter(Boolean).length,0);
   if(yes!==r.ev.length)bad.push(`50%: fila ${yes} ≠ tocou ${r.ev.length}`);
   // micro: +20% atrasa 0,2 passo; −30% adianta
-  reset();useClicks();E(`const p=newPattern();p.len=16;p.n[8][4].push(0);p.lk[8][4]={mi:.2};p.n[8][8].push(1);p.lk[8][8]={mi:-.3};S.patterns[0]=p;`);
+  reset();useClicks();E(`const p=newPattern();p.len=16;addK(p,8,4,0);TL(p,8,4,{mi:.2});addK(p,8,8,1);TL(p,8,8,{mi:-.3});S.patterns[0]=p;`);
   r=await render({steps:16,dry:true});const d=E('stepDur()'),o=onsets(r.buf);
   const em=Math.max(Math.abs(o[0]-(r.t0+4.2*d)),Math.abs(o[1]-(r.t0+7.7*d)));if(!(o.length===2&&em<.001))bad.push(`micro: erro ${ms(em)}`);
   rec(N,!bad.length,bad.length?bad.join(' · '):`ratchet 3 = 3 ataques (100/90/81%) · tie sem ataque · 1:2, 2:2, 1:4, FILL, !FILL e 50% certos (${yes}/64) · micro ±1 ms`)};
 
 T['9.6 latência']=async()=>{const N='9.6 latência';
   reset();const d=E('ensureCtx();S.bpm=240;stepDur()');   // 240 BPM: passo de 62,5 ms, 40 ms de atraso já cai no passo seguinte
-  E(`sched=[];for(let i=0;i<8;i++)sched.push({time:10+i*${d},real:i,step:i,pat:0,g:i,dice:{}});S.latAdj=0;`);
+  E(`sched=[];for(let i=0;i<8;i++)sched.push({time:10+i*${d},real:i,step:i,pat:0,g:i,dice:{}});DEV.latAdj=0;`);
   const pick=(lat,t)=>E(`TST.fakeLat=${lat};nearest(touchT(${t})).real`);
   let okC=0,okN=0,n=0;
   for(let i=1;i<7;i++)for(const j of [-.02,0,.02]){n++;const t=10+i*d+.04+j;if(pick(.04,t)===i)okC++;if(pick(0,t)===i)okN++}
   // ajuste calibrado soma à latência do sistema
-  E('S.latAdj=40');const adj=pick(0,10+3*d+.04+.02)===3;E('S.latAdj=0;TST.fakeLat=null;sched=[]');
+  E('DEV.latAdj=40');const adj=pick(0,10+3*d+.04+.02)===3;E('DEV.latAdj=0;TST.fakeLat=null;sched=[]');
   // calibração: mediana dos erros
   const cal=E(`(()=>{const c=[0,.5,1,1.5,2,2.5,3,3.5,4],t=[.031,.52,1.028,1.535,2.03,2.54,3.025,3.6,4.03];const e=calibErrs(c,t).sort((a,b)=>a-b);return Math.round(e[e.length>>1]*1000)})()`);
   rec(N,okC===n&&okN<n&&adj&&cal===30,`240 BPM, latência de 40 ms: ${okC}/${n} toques no passo certo (sem compensar seriam ${okN}/${n}) · ajuste calibrado ${adj?'ok':'errado'} · mediana da calibração ${cal} ms (esperado 30)`)};
@@ -158,15 +159,15 @@ T['9.6 latência']=async()=>{const N='9.6 latência';
 T['9.7 DUCK e limitador']=async()=>{const N='9.7 DUCK e limitador',bad=[];
   // tom constante no som 2, gatilho silencioso no som 10: a saída mostra só o ganho do barramento
   reset();A.__tone=(()=>{const r=44100,d=new Float32Array(r*3);for(let i=0;i<d.length;i++)d[i]=.4*Math.sin(2*Math.PI*220*i/r);return d})();
-  E(`samples[1]={data:window.__tone,rate:44100};invalidate(1);S.slots[1]=newSlot('tom');samples[9]={data:new Float32Array(44100),rate:44100};invalidate(9);S.slots[9]=newSlot('mudo');
-    S.mix.dp=1;S.mix.ds=150;S.mix.dk={s:9,k:0};const p=newPattern();p.len=16;p.n[1][0].push(0);p.n[9][4].push(0);S.patterns[0]=p;`);
+  E(`samples[1]={data:window.__tone,rate:44100};invalidate(1);S.instr[1]=newSlot('tom');samples[9]={data:new Float32Array(44100),rate:44100};invalidate(9);S.instr[9]=newSlot('mudo');
+    S.mix.dp=1;S.mix.ds=150;S.mix.dk={s:9,k:0};const p=newPattern();p.len=16;addK(p,1,0,0);addK(p,9,4,0);S.patterns[0]=p;`);
   const r=await render({steps:16,bare:true}),b=r.buf.getChannelData(0),sr=r.buf.sampleRate,d=E('stepDur()'),tk=r.t0+4*d;
   const rms=(a,z)=>{let s=0,n=0;for(let i=Math.round(a*sr);i<Math.round(z*sr);i++){s+=b[i]*b[i];n++}return Math.sqrt(s/n)};
   const db=x=>20*Math.log10(Math.max(x,1e-9)),ref=rms(tk-.2,tk-.02),dip=db(rms(tk+.003,tk+.010)/ref),back=db(rms(tk+.15,tk+.165)/ref);
   if(!(dip<-20))bad.push(`duck só ${dip.toFixed(1)} dB`);if(!(back>-1))bad.push(`não voltou: ${back.toFixed(1)} dB após 150 ms`);
   // limitador: 16 sons no máximo, volume 16
-  reset();E(`for(const i of [6,7]){samples[i]=samples[i-6]}for(const i of [12,13,14,15]){samples[i]=samples[i-4]}for(let i=0;i<16;i++){invalidate(i);S.slots[i].params.v=1;S.slots[i].slices=defSlices()}
-    S.vol=16;const p=newPattern();p.len=16;for(let s=0;s<16;s++)for(let st=0;st<16;st+=2)p.n[s][st].push(s<8?0:st%4);S.patterns[0]=p;`);
+  reset();E(`for(const i of [6,7]){samples[i]=samples[i-6]}for(const i of [12,13,14,15]){samples[i]=samples[i-4]}for(let i=0;i<16;i++){invalidate(i);S.instr[i].params.v=1;S.instr[i].slices=defSlices()}
+    S.vol=16;const p=newPattern();p.len=16;for(let s=0;s<16;s++)for(let st=0;st<16;st+=2)addK(p,s,st,s<8?0:st%4);S.patterns[0]=p;`);
   const r2=await render({steps:32}),c=r2.buf.getChannelData(0);let pk=0;for(let i=0;i<c.length;i++)pk=Math.max(pk,Math.abs(c[i]));
   // sem limitador, o mesmo trecho passaria disso
   const r3=await render({steps:32,bare:true}),c3=r3.buf.getChannelData(0);let pk3=0;for(let i=0;i<c3.length;i++)pk3=Math.max(pk3,Math.abs(c3[i]));
@@ -182,8 +183,8 @@ T['9.8 CHOP']=async()=>{const N='9.8 CHOP',bad=[];
   if(fr.length!==8)bad.push(`${fr.length} fatias (esperava 8)`);
   const err=fr.length===8?Math.max(...fr.map((t,i)=>Math.abs(t-at[i]))):1;if(err>.005)bad.push(`erro ${ms(err)}`);
   // distribuir: começo + 8 ataques viram pads 1–9 (e repetem nos seguintes)
-  reset();E(`samples[2]={data:window.__chop,rate:${r}};S.slots[2]=newSlot('loop');S.curSound=2;setMode('sound');chopStart();chopAttacks();chopDistribute()`);
-  const to=E('S.curSound'),sl=E(`S.slots[${to}].slices.map(x=>x.st)`);
+  reset();E(`samples[2]={data:window.__chop,rate:${r}};S.instr[2]=newSlot('loop');S.curSound=2;setMode('sound');chopStart();chopAttacks();chopDistribute()`);
+  const to=E('S.curSound'),sl=E(`S.instr[${to}].slices.map(x=>x.st)`);
   if(to<8)bad.push('distribuir não foi para um som de bateria');
   else if(sl.slice(1,9).some((x,i)=>Math.abs(x*len/r-at[i])>.005))bad.push('fatias fora do lugar');   // pad 1 = começo da amostra, pads 2–9 = ataques
   // grade 4
@@ -197,30 +198,57 @@ T['extra · loop livre e textura']=async()=>{const N='extra · loop livre e text
   if(!(c.n===2&&c.bpm>=70&&c.bpm<=180))bad.push(`5,5 s → ${c.n}c ${c.bpm}`);
   // loop livre: 2 s com notas em 0, 0,5 e 1,0 s → 1 compasso a 120 BPM, notas nos passos 1, 5 e 9
   reset();E(`ensureCtx();S.perf.free=true;freeCap={i:0,t0:ctx.currentTime-2,ev:[[8,0,ctx.currentTime-2+.01],[8,1,ctx.currentTime-1.5-.02],[8,2,ctx.currentTime-1]]};freeClose();stopPlay()`);
-  const t=E(`(()=>{const t=S.perf.tracks[0];return {len:t.len,st:t.ev.map((a,i)=>a.length?i:-1).filter(i=>i>=0),bpm:S.bpm,free:S.perf.free}})()`);
+  const t=E(`(()=>{const t=S.loops[0];return {len:t.len,st:Object.keys(t.tr[8].p).map(Number),bpm:S.bpm,free:S.perf.free}})()`);
   if(!(t.len===1&&JSON.stringify(t.st)==='[0,4,8]'&&t.bpm===120&&!t.free))bad.push(`loop livre: ${JSON.stringify(t)}`);
   // textura: o ponto de volta do loop não tem salto
   const j=E(`(()=>{const d=new Float32Array(44100);for(let i=0;i<d.length;i++)d[i]=Math.sin(2*Math.PI*137.3*i/44100);const b=texBuf(d,44100),x=b.getChannelData(0);return Math.abs(x[x.length-1]-x[0])})()`);
   if(!(j<.05))bad.push(`salto no loop da textura ${j.toFixed(3)}`);
   rec(N,!bad.length,bad.length?bad.join(' · '):`BPM pelo loop: 2 s → 120, 1,6 s → 150, 5,5 s → ${c.n} comp a ${c.bpm} · notas quantizadas nos passos 1, 5, 9 · loop da textura sem salto (${j.toFixed(3)})`)};
 
+/* migração 1 → 2: um projeto salvo no formato antigo abre no formato novo e toca igual à referência */
+T['9.11 migração v1 → v2']=async()=>{const N='9.11 migração v1 → v2',bad=[];
+  reset();E(`(()=>{const v1p=()=>({len:16,sc:Array.from({length:16},()=>({c:0,d:1})),mx:Array(64).fill(null),n:Array.from({length:16},()=>Array.from({length:64},()=>[])),lk:Array.from({length:16},()=>Array(64).fill(null)),fx:Array(64).fill(-1),mute:Array(16).fill(false),solo:Array(16).fill(false)});
+    const p=v1p(),k=(s,st,key)=>p.n[s][st].push(key);
+    [0,4,8,12].forEach(i=>k(8,i,0));[4,12].forEach(i=>k(8,i,2));for(let i=0;i<16;i+=2)k(8,i,5);k(8,7,5);k(8,15,7);
+    [0,3,6,8,10,11,14].forEach((i,j)=>k(0,i,[0,0,7,4,3,4,2][j]));p.lk[0][8]={f:.25,r:.4};
+    const q=v1p();q.n[1][3].push(2);q.lk[1][3]={rat:3,f:.2};q.fx[5]=8;q.mx[6]={dj:.3};q.sc[1]={c:12,d:2};q.mute[2]=true;
+    const o={v:1,vis:false,bpm:120,swing:30,vol:8,curPattern:0,chain:[0,0,1],curSound:8,noDemo:true,latAdj:-17,mix:Object.assign(MIXDEF(),{fade:14}),
+      patterns:[p,q].concat(Array.from({length:14},v1p)),slots:S.instr.map(x=>JSON.parse(JSON.stringify(x))),
+      perf:{q:'comp',tracks:[{len:1,ev:Object.assign(Array(16).fill(null).map(()=>[]),{2:[[8,1,.5,0]]}),st:'play',mute:false,fb:80,layers:2}]}};
+    window.__keep=S;S=migrate(JSON.parse(JSON.stringify(o)))})()`);
+  const c=E(`(()=>{const a=S.patterns[1],x=a.tr[1].p[3],L=S.loops[0].tr[8].p[2];return {v:S.v,instr:Array.isArray(S.instr)&&!S.slots,
+    rich:!!x&&x.rat===3&&x.l&&x.l.f===.2&&!('rat' in x.l),fx:fxAt(a,5)===8&&djAt(a,6)===.3,tr:a.tr[1].c===12&&a.tr[1].d===2&&a.tr[2].m===true,
+    chain:chainTxt(S.chain),loop:!!L&&L.k[0]===1&&L.g[0]===.5&&S.loops.length===4&&S.loops[0].fb===80,dev:DEV.latAdj===-17&&DEV.fade===14&&!('latAdj' in S)&&!('fade' in S.mix),
+    sparse:Object.keys(S.patterns[0].tr[8].p).length}})()`);
+  if(c.v!==2)bad.push('versão '+c.v);if(!c.instr)bad.push('instr');if(!c.rich)bad.push('passo rico fora da trava');if(!c.fx)bad.push('trilha FX');
+  if(!c.tr)bad.push('comp/div/mute na trilha');if(c.chain!=='1×2›2')bad.push('cadeia '+c.chain);if(!c.loop)bad.push('loop PERF');if(!c.dev)bad.push('aparelho');
+  let g={};try{g=await (await fetch('testes/golden.json',{cache:'no-store'})).json()}catch(e){}
+  const ref=g[engine]&&g[engine].fp;let md=-1;
+  if(ref){E('S.chain=chainOf([0]);S.curPattern=0;S.loops=newLoops();DEV=DEVDEF()');const f=fingerprint((await render({steps:32})).buf);md=0;if(f.length!==ref.length)md=999;else for(let i=0;i<f.length;i++)md=Math.max(md,Math.abs(f[i]-ref[i]));if(md>2)bad.push(`áudio do padrão migrado mudou (${md}/1000)`)}
+  E('S=window.__keep');
+  rec(N,!bad.length,bad.length?bad.join(' · '):`versão 2 · passo rico fora da trava · trilha FX · cadeia ${c.chain} · loop PERF · aparelho separado · ${c.sparse} passos guardados de 64 · áudio ${md<0?'sem referência':'igual à referência ('+md+'/1000)'}`)};
+
 /* persistência: cada fase acrescenta campos em PERSIST (expressão que monta, expressão que confere) */
 const PERSIST=[
-  ['passo rico e calibração',`S.patterns[2].lk[3][7]={rat:3,mi:-.2,cd:4,tie:true};S.latAdj=-23`,`JSON.stringify(S.patterns[2].lk[3][7])==='{"rat":3,"mi":-0.2,"cd":4,"tie":true}'&&S.latAdj===-23`],
-  ['mix e INSERT',`S.mix.dp=.6;S.mix.dj=.3;S.mix.dk={s:9,k:2};S.slots[4].ins={t:2,a:.7};S.patterns[2].mx[5]={dj:.8}`,`S.mix.dp===.6&&S.mix.dj===.3&&S.mix.dk.s===9&&S.slots[4].ins.t===2&&S.patterns[2].mx[5].dj===.8`],
-  ['marcas do CHOP',`S.slots[3].marks=[0,.25,.6]`,`JSON.stringify(S.slots[3].marks)==='[0,0.25,0.6]'`],
+  ['passo rico',`addK(S.patterns[2],3,7,1);TL(S.patterns[2],3,7,{rat:3,mi:-.2,cd:4,tie:true,f:.3})`,`(x=>x.rat===3&&x.mi===-.2&&x.cd===4&&x.tie===true&&x.l.f===.3&&x.k[0]===1)(S.patterns[2].tr[3].p[7])`],
+  ['mix e INSERT',`S.mix.dp=.6;S.mix.dj=.3;S.mix.dk={s:9,k:2};S.instr[4].ins={t:2,a:.7};fxSet(S.patterns[2],5,'dj',.8);fxSet(S.patterns[2],6,'fx',3)`,`S.mix.dp===.6&&S.mix.dj===.3&&S.mix.dk.s===9&&S.instr[4].ins.t===2&&djAt(S.patterns[2],5)===.8&&fxAt(S.patterns[2],6)===3`],
+  ['cenas e cadeia',`S.cenas=[];S.chain=chainOf([0,0,2]);S.chain.push({c:cenaFor(1,[true,false,true,false]),x:2})`,`chainTxt(S.chain)==='1×2›3›2+F13×2'&&S.cenas.length===3`],
+  ['marcas do CHOP',`S.instr[3].marks=[0,.25,.6]`,`JSON.stringify(S.instr[3].marks)==='[0,0.25,0.6]'`],
   ['textura',`S.tex={s:5,vol:.3,f:.4,frz:false}`,`S.tex.s===5&&S.tex.vol===.3&&S.tex.f===.4`],
-  ['comp/div por som',`S.patterns[2].sc[5]={c:12,d:2}`,`S.patterns[2].sc[5].c===12&&S.patterns[2].sc[5].d===2`],
+  ['comp/div, mute e solo',`Object.assign(S.patterns[2].tr[5],{c:12,d:2,m:true,so:true})`,`(t=>t.c===12&&t.d===2&&t.m&&t.so)(S.patterns[2].tr[5])`],
 ];
 T['9.9 persistência']=async()=>{const N='9.9 persistência';
-  reset();for(const [,set] of PERSIST)E(set);
+  reset();for(const [,set] of PERSIST)E(set);E('DEV.latAdj=-23;DEV.fade=12');
   await E('save(true)');
+  E(`window.__dv=null`);await E(`idb.get('aparelho').then(x=>{window.__dv=x})`);
+  const dev=E(`!!window.__dv&&window.__dv.latAdj===-23&&window.__dv.fade===12`);
   E(`window.__st=null`);await E(`idb.get('state').then(x=>{window.__st=x})`);
   E(`window.__keep=S;S=migrate(structuredClone(window.__st))`);
   const bad=PERSIST.filter(([,,chk])=>{try{return !E(chk)}catch(e){return true}}).map(x=>x[0]);
+  if(!dev)bad.push('aparelho (latência, fade)');if(E(`'latAdj' in window.__st||'fade' in window.__st.mix`))bad.push('aparelho vazou no projeto');
   E(`S=window.__keep`);
   // padrão salvo antes destas mudanças (sem os campos novos) abre sem erro
-  let old=true;try{E(`const o=JSON.parse(JSON.stringify(S));o.patterns.forEach(p=>{delete p.sc});delete o.mix;o.patterns.forEach(p=>{delete p.mx});for(const sl of o.slots){delete sl.ins;delete sl.marks}const m=migrate(o);if(!m.patterns.every(p=>p.sc&&p.sc.length===16&&p.mx))throw 0;if(!m.mix||!m.slots[0].ins)throw 0`)}catch(e){old=false}
+  let old=true;try{E(`const o=JSON.parse(JSON.stringify(S));delete o.mix;o.patterns.forEach(p=>{delete p.fx;p.tr.forEach(t=>{delete t.c;delete t.m})});for(const sl of o.instr){delete sl.ins;delete sl.marks}const m=migrate(o);if(!m.patterns.every(p=>p.fx&&p.tr.every(t=>t.c===0&&t.m===false)))throw 0;if(!m.mix||!m.instr[0].ins)throw 0`)}catch(e){old=false}
   rec(N,!bad.length&&old,bad.length?`não voltou: ${bad.join(', ')}`:`${PERSIST.length} grupos de dados voltaram · formato antigo abre ${old?'ok':'COM ERRO'}`)};
 
 /* testes registrados pelas fases seguintes */
