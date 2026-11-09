@@ -100,6 +100,35 @@ T['9.10 orçamento de CPU']=async()=>{
   window.CPU={wall,dur,pc};
   rec('9.10 orçamento de CPU',pc<25,`8 compassos com 16 sons e FX: render ${wall.toFixed(2)}s para ${dur.toFixed(1)}s de áudio = ${pc.toFixed(1)}% (limite 25%)`)};
 
+T['9.3 polimetria']=async()=>{const N='9.3 polimetria';
+  reset();useClicks(8);useClicks(9);E(`const p=newPattern();p.len=64;p.n[8][0].push(0);p.sc[8].c=16;p.n[9][0].push(1);p.sc[9].c=12;
+    p.n[10][1].push(0);p.sc[10]={c:4,d:2};p.n[11][1].push(0);p.sc[11]={c:8,d:0};S.patterns[0]=p;S.chain=[0];
+    samples[10]=samples[8];samples[11]=samples[8];invalidate(10);invalidate(11);`);
+  const r=await render({steps:64,dry:true}),dur=E('stepDur()'),pos=e=>(e.t-r.t0)/dur;
+  const A_=r.ev.filter(e=>e.s===8).map(pos),B_=r.ev.filter(e=>e.s===9).map(pos),C_=r.ev.filter(e=>e.s===10).map(pos),D_=r.ev.filter(e=>e.s===11).map(pos);
+  const eq=(a,b)=>a.length===b.length&&a.every((x,i)=>Math.abs(x-b[i])<1e-6);
+  const both=A_.filter(x=>x>0&&B_.some(y=>Math.abs(x-y)<1e-6));
+  const okA=eq(A_,[0,16,32,48]),okB=eq(B_,[0,12,24,36,48,60]),okC=eq(C_,[2,10,18,26,34,42,50,58]),okD=eq(D_,[.5,4.5,8.5,12.5,16.5,20.5,24.5,28.5,32.5,36.5,40.5,44.5,48.5,52.5,56.5,60.5]);
+  // 2 voltas do padrão: o ciclo recomeça do passo 1 sem acumular erro
+  const r2=await render({steps:128,dry:true}),B2=r2.ev.filter(e=>e.s===9).map(e=>(e.t-r2.t0)/dur);
+  const okWrap=eq(B2,[0,12,24,36,48,60,64,76,88,100,112,124]);
+  rec(N,okA&&okB&&okC&&okD&&okWrap&&both[0]===48,`A ${okA?'ok':'errado'} · B ${okB?'ok':'errado'} · 16 sobre 12 coincidem no passo ${both[0]+1} (esperado 49) · 1/8 ${okC?'ok':'errado'} · 1/32 ${okD?'ok':'errado'} · 2ª volta ${okWrap?'ok':'errada'}`)};
+
+/* persistência: cada fase acrescenta campos em PERSIST (expressão que monta, expressão que confere) */
+const PERSIST=[
+  ['comp/div por som',`S.patterns[2].sc[5]={c:12,d:2}`,`S.patterns[2].sc[5].c===12&&S.patterns[2].sc[5].d===2`],
+];
+T['9.9 persistência']=async()=>{const N='9.9 persistência';
+  reset();for(const [,set] of PERSIST)E(set);
+  await E('save(true)');
+  E(`window.__st=null`);await E(`idb.get('state').then(x=>{window.__st=x})`);
+  E(`window.__keep=S;S=migrate(structuredClone(window.__st))`);
+  const bad=PERSIST.filter(([,,chk])=>{try{return !E(chk)}catch(e){return true}}).map(x=>x[0]);
+  E(`S=window.__keep`);
+  // padrão salvo antes destas mudanças (sem os campos novos) abre sem erro
+  let old=true;try{E(`const o=JSON.parse(JSON.stringify(S));o.patterns.forEach(p=>{delete p.sc});for(const sl of o.slots){delete sl.ins;delete sl.marks}const m=migrate(o);if(!m.patterns.every(p=>p.sc&&p.sc.length===16))throw 0`)}catch(e){old=false}
+  rec(N,!bad.length&&old,bad.length?`não voltou: ${bad.join(', ')}`:`${PERSIST.length} grupos de dados voltaram · formato antigo abre ${old?'ok':'COM ERRO'}`)};
+
 /* testes registrados pelas fases seguintes */
 window.T=T;
 

@@ -117,6 +117,8 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 .lrow.sel{box-shadow:0 0 0 1.5px #555;background:#f6f5f1}
 .lmore{flex:0 0 auto;height:36px;border:1px dashed #0000004d;border-radius:10px;font-size:12px;font-weight:600;color:#55544f}
 .lname{flex:0 0 clamp(60px,15vw,110px);border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px;text-align:left;margin-bottom:2px}
+.lname span{display:block;overflow:hidden;text-overflow:ellipsis}
+.lname small{display:block;font:8.5px/1.3 var(--px);color:var(--hit);overflow:hidden;text-overflow:ellipsis}
 .lm,.ls{flex:0 0 30px;border-radius:8px;font-size:11px;font-weight:700;margin-bottom:2px}
 .lcells{flex:1;display:grid;gap:2px;min-width:0}
 .lcells div{border-radius:2px;background:#f6f5f1;border:1px solid #00000033;position:relative;cursor:pointer;min-width:0}
@@ -317,13 +319,15 @@ let undoSt=[],passSnap=null,passTouched=false,eraseOn=false;
 const pressT=new Float64Array(16).fill(-9);
 let perfPend=[],perfSel=0;
 
-const newPattern=()=>({len:16,n:Array.from({length:16},()=>Array.from({length:64},()=>[])),lk:Array.from({length:16},()=>Array(64).fill(null)),fx:Array(64).fill(-1),mute:Array(16).fill(false),solo:Array(16).fill(false)});
+const newSc=()=>Array.from({length:16},()=>({c:0,d:1}));
+const newPattern=()=>({len:16,sc:newSc(),n:Array.from({length:16},()=>Array.from({length:64},()=>[])),lk:Array.from({length:16},()=>Array(64).fill(null)),fx:Array(64).fill(-1),mute:Array(16).fill(false),solo:Array(16).fill(false)});
 const newTrack=()=>({len:0,ev:[],st:'empty',mute:false,fb:100,layers:0,t0:0,undo:[],redo:[],pass:null,touched:false});
 const newPerf=()=>({q:'comp',tracks:[newTrack(),newTrack(),newTrack(),newTrack()]});
 function migrate(s){
   for(const p of s.patterns){if(!PLEN.includes(p.len))p.len=16;
     for(let i=0;i<16;i++){while(p.n[i].length<64)p.n[i].push([]);while(p.lk[i].length<64)p.lk[i].push(null)}
-    while(p.fx.length<64)p.fx.push(-1);if(!Array.isArray(p.mute))p.mute=Array(16).fill(false);if(!Array.isArray(p.solo))p.solo=Array(16).fill(false)}
+    while(p.fx.length<64)p.fx.push(-1);if(!Array.isArray(p.mute))p.mute=Array(16).fill(false);if(!Array.isArray(p.solo))p.solo=Array(16).fill(false);
+    if(!Array.isArray(p.sc)||p.sc.length!==16)p.sc=newSc();p.sc.forEach(x=>{if(!(x.c>=0&&x.c<=64))x.c=0;if(!(x.d>=0&&x.d<7))x.d=1})}
   if(s.met===undefined)s.met=1;if(s.metVol===undefined)s.metVol=6;if(s.countIn===undefined)s.countIn=true;
   if(!(s.rept>=0&&s.rept<4))s.rept=0;if(s.page===undefined)s.page=0;if(s.follow===undefined)s.follow=true;
   if(s.layAll===undefined)s.layAll=false;s.layFull=false;if(s.layView===undefined)s.layView=false;
@@ -533,10 +537,11 @@ function scheduleStep(){
   if(fx===12){const q=real%4,bs=nextTime-q*dur;if(q===3){skip=true;t=nextTime}else t=bs+[0,4/3,8/3][q]*dur}
   if(g%4===0&&metOn())click(nextTime,g%16===0);
   // borracha: segurar o pad apaga a nota do som atual nos passos que passarem
-  if(eraseOn&&liveRecOn&&mode==='play'){const cs=S.curSound;for(let k=0;k<16;k++)if(pressed[k]){const a=pat.n[cs][real],i=a.indexOf(k);if(i>=0){a.splice(i,1);if(!a.length)pat.lk[cs][real]=null;passTouched=true;dirty()}}}
+  if(eraseOn&&liveRecOn&&mode==='play'){const cs=S.curSound;for(let k=0;k<16;k++)if(pressed[k])for(const [ls] of locHits(pat,cs,real)){const a=pat.n[cs][ls],i=a.indexOf(k);if(i>=0){a.splice(i,1);if(!a.length)pat.lk[cs][ls]=null;passTouched=true;dirty()}}}
   const n=fx===8?4:fx===9?3:1,solo=pat.solo.some(Boolean);
-  if(!skip)for(let s=0;s<16;s++){if(pat.mute[s]||(solo&&!pat.solo[s]))continue;const notes=pat.n[s][step];if(!notes.length)continue;const lock=pat.lk[s][step];
-    for(const k of notes)for(let r=0;r<n;r++)trigger(s,k,t+r*dur/n,{lock,fx,maxDur:n>1?dur/n*.95:0})}
+  if(!skip)for(let s=0;s<16;s++){if(pat.mute[s]||(solo&&!pat.solo[s]))continue;
+    for(const [ls,fr] of locHits(pat,s,step)){const notes=pat.n[s][ls];if(!notes.length)continue;const lock=pat.lk[s][ls],w=fr||DIVF[pat.sc[s].d]>1?dur/2:dur;
+      for(const k of notes)for(let r=0;r<n;r++)trigger(s,k,t+fr*dur+r*w/n,{lock,fx,maxDur:n>1?w/n*.95:0})}}
   if(S.rept&&(mode==='play'||mode==='perf')&&!(eraseOn&&liveRecOn&&mode==='play'))reptStep(pat,real,t,dur,g);
   perfStep(t,g);
   sched.push({time:t,step,real,pat:playPat,g});
@@ -568,12 +573,24 @@ function reptStep(pat,real,t,dur,g){const cs=S.curSound,div=S.rept;
     const hits=div===1?(g%2===0?[0]:[]):div===2?[0]:[0,.5];
     for(const h of hits){const tt=t+h*dur;if(tt<pressT[k]+dur*.6)continue;
       trigger(cs,k,tt,{fx:heldFx});
-      if(mode==='play'&&liveRecOn){const a=pat.n[cs][real];if(!a.includes(k)){a.push(k);passTouched=true;dirty()}}
+      if(mode==='play'&&liveRecOn){const a=pat.n[cs][locNear(pat,cs,real,h)];if(!a.includes(k)){a.push(k);passTouched=true;dirty()}}
       if(mode==='perf')perfAdd(cs,k,g)}}}
 const ep=()=>S.patterns[playing&&visCur?visCur.pat:S.curPattern];
 const epIdx=()=>playing&&visCur?visCur.pat:S.curPattern;
-const npages=p=>Math.max(1,(p.len/16)|0);
-function viewPage(){const p=ep(),n=npages(p);if(S.follow&&playing&&visCur&&visCur.pat===epIdx())return Math.min(n-1,(visCur.real/16)|0);return Math.min(S.page,n-1)}
+/* polimetria: cada som tem comprimento (c, 0 = o do padrão) e divisão própria. O passo local é
+   floor(posição no padrão × fator) mod c, contado sempre do início do padrão, então nada sai de fase. */
+const DIVL=['1/32','1/16','1/8','1/4','1/2','1c','2c'],DIVF=[2,1,.5,.25,.125,1/16,1/32];
+const sComp=(p,s)=>p.sc[s].c||p.len;
+const isPoly=(p,s)=>(p.sc[s].c&&p.sc[s].c!==p.len)||p.sc[s].d!==1;
+function locHits(p,s,pos){const c=sComp(p,s),f=DIVF[p.sc[s].d];
+  if(f===1)return [[pos%c,0]];
+  if(f>1)return [[(pos*2)%c,0],[(pos*2+1)%c,.5]];
+  const per=Math.round(1/f);return pos%per?[]:[[(pos/per)%c,0]]}
+const locAt=(p,s,pos)=>Math.floor(pos*DIVF[p.sc[s].d]+1e-9)%sComp(p,s);           // passo local que está soando
+const locNear=(p,s,base,fr=0)=>{const c=sComp(p,s),f=DIVF[p.sc[s].d];return f===1?base%c:((Math.round((base+fr)*f)%c)+c)%c};   // passo local mais próximo (gravação): base = passo do padrão mais próximo, fr = desvio em passos
+const vlen=p=>Math.max(p.len,...p.sc.map(x=>x.c||0));
+const npages=p=>Math.max(1,Math.ceil(vlen(p)/16));
+function viewPage(){const p=ep(),n=npages(p);if(S.follow&&playing&&visCur&&visCur.pat===epIdx())return Math.min(n-1,(locAt(p,S.curSound,visCur.real)/16)|0);return Math.min(S.page,n-1)}
 
 /* --- desfazer por volta (gravação ao vivo) --- */
 function snapPat(pi){const p=S.patterns[pi];return {pi,n:p.n.map(r=>r.map(a=>a.slice())),lk:p.lk.map(r=>r.map(x=>x?{...x}:null))}}
@@ -662,7 +679,7 @@ function toggleStep(k){const pat=ep(),sl=S.slots[S.curSound],arr=pat.n[S.curSoun
   if(arr.length){arr.length=0;pat.lk[S.curSound][k]=null}else{arr.push(sl.lastKey);if(!playing)playNow(S.curSound,sl.lastKey)}dirty()}
 function nearest(){if(!ctx)return null;const now=ctx.currentTime;let best=null,bd=1e9;for(const e of sched){const d=Math.abs(e.time-now);if(d<bd){bd=d;best=e}}return best}
 function liveRec(k){const slot=S.curSound;S.slots[slot].lastKey=k;playNow(slot,k);const best=nearest();
-  if(!best)return;const arr=S.patterns[best.pat].n[slot][best.real];if(!arr.includes(k)){arr.push(k);passTouched=true}dirty()}
+  if(!best)return;const p=S.patterns[best.pat],posF=best.real+(ctx.currentTime-best.time)/stepDur(),arr=p.n[slot][locNear(p,slot,best.real,posF-best.real)];if(!arr.includes(k)){arr.push(k);passTouched=true}dirty()}
 function copySound(from,to){if(from===to)return;const s=samples[from];samples[to]=s?{data:s.data.slice(),rate:s.rate}:null;
   const a=S.slots[from];S.slots[to]={name:a.name,params:{...a.params},slices:(from>=8&&to>=8)?a.slices.map(x=>({...x})):defSlices(),lastKey:0};
   invalidate(to);samplesChanged();flash(`SOM ${pad(from+1)} → ${pad(to+1)} COPIADO`)}
@@ -862,6 +879,7 @@ const $=id=>document.getElementById(id);
 const MODES=[['play','Tocar'],['steps','Passos'],['sound','Som'],['pattern','Padrão'],['fx','FX'],['perf','Perf']];
 const NN=['C','D','E','F','G','A','B'];
 const noteName=k=>NN[k%7]+(3+Math.floor(k/7));
+let polyEd=false;
 let mode='play',micOn=false,chainOn=false,lockOn=false,liveRecOn=false,fxLatch=false,fxRec=false,copyArm=null,chainBuild=[];
 const armed={},padHit=new Float64Array(16).fill(-9),keyEls=[],stripEls=[],ovwEls=[],layRows=[],perfEls=[];
 let taps=[];
@@ -875,18 +893,18 @@ function needConf(n){if(armed[n]&&armed[n]>performance.now()){armed[n]=0;return 
 
 function getKnob(i){const sl=S.slots[S.curSound],key=PAGES[page].k[i];
   if(page===2&&S.curSound>=8){const s=sl.slices[sl.lastKey];return i===0?s.st:Math.sqrt(Math.max(0,(s.ln-.003)/.4))}
-  if(page<2&&lockOn&&playing&&visCur){const l=S.patterns[visCur.pat].lk[S.curSound][visCur.real];if(l&&l[key]!=null)return l[key]}
+  if(page<2&&lockOn&&playing&&visCur){const P_=S.patterns[visCur.pat],l=P_.lk[S.curSound][locAt(P_,S.curSound,visCur.real)];if(l&&l[key]!=null)return l[key]}
   return sl.params[key]}
 function setKnob(i,v){v=clamp01(v);const sl=S.slots[S.curSound],key=PAGES[page].k[i];
   if(page===2){if(S.curSound>=8){const s=sl.slices[sl.lastKey];if(i===0)s.st=Math.min(v,.995);else s.ln=.003+v*v*.4}else sl.params[key]=i===1?Math.max(.01,v):Math.min(v,.99);dirty();return}
-  if(lockOn&&playing&&visCur){const L=S.patterns[visCur.pat].lk[S.curSound];L[visCur.real]={...(L[visCur.real]||{}),[key]:v};dirty();return}
+  if(lockOn&&playing&&visCur){const P_=S.patterns[visCur.pat],L=P_.lk[S.curSound],ls=locAt(P_,S.curSound,visCur.real);L[ls]={...(L[ls]||{}),[key]:v};dirty();return}
   sl.params[key]=v;dirty()}
 function fmt(key,v){
   if(key==='p'){const s=(v-.5)*24;return S.curSound<8?`${Math.round(s)>0?'+':''}${Math.round(s)}st`:`${s>0?'+':''}${s.toFixed(1)}st`}
   if(key==='f')return v<.47?`LP ${Math.round((1-v/.47)*100)}`:v>.53?`HP ${Math.round((v-.53)/.47*100)}`:'aberto';
   return `${Math.round(v*100)}`}
 
-function setMode(m){const prev=mode;mode=m;if(prev==='sound'&&m!=='sound'&&micOn){micOn=false;closeMic()}copyArm=null;chainOn=false;if(m!=='fx'&&!fxLatch)heldFx=-1;if(m!=='play')eraseOn=false;$('app').dataset.mode=m}
+function setMode(m){const prev=mode;mode=m;polyEd=false;if(prev==='sound'&&m!=='sound'&&micOn){micOn=false;closeMic()}copyArm=null;chainOn=false;if(m!=='fx'&&!fxLatch)heldFx=-1;if(m!=='play')eraseOn=false;$('app').dataset.mode=m}
 function setVis(on){S.vis=on;$('gl').style.visibility=on?'visible':'hidden';if(on)glInit();dirty()}
 
 /* --- pads --- */
@@ -894,14 +912,14 @@ function padDown(k){ensureCtx();const cs=S.curSound,sl=S.slots[cs];
   switch(mode){
     case 'play':sl.lastKey=k;pressT[k]=ctx.currentTime;if(eraseOn&&liveRecOn&&playing)break;if(liveRecOn&&playing)liveRec(k);else playNow(cs,k);break;
     case 'perf':{sl.lastKey=k;pressT[k]=ctx.currentTime;playNow(cs,k);const b=playing?nearest():null;if(b)perfAdd(cs,k,b.g);break}
-    case 'steps':{if(S.layView)break;const st=viewPage()*16+k;if(st<ep().len)toggleStep(st);break}
+    case 'steps':{if(S.layView)break;const st=viewPage()*16+k;if(st<sComp(ep(),S.curSound))toggleStep(st);break}
     case 'sound':if(micOn){startSampling(k);break}if(copyArm==='sound'){copySound(cs,k);copyArm=null}else{S.curSound=k;flash(`SOM ${pad(k+1)} ${S.slots[k].name||'VAZIO'}`);if(samples[k])playNow(k,S.slots[k].lastKey)}dirty();break;
     case 'pattern':if(chainOn){if(chainBuild.length<128){chainBuild.push(k);applyChain(chainBuild.slice())}break}if(copyArm==='pattern'){copyPattern(k);copyArm=null}else applyChain([k]);break;
     case 'fx':if(k===15){heldFx=-1;flash('SEM EFEITO')}else if(fxLatch)heldFx=heldFx===k?-1:k;else heldFx=k;
       if(!playing&&heldFx>=0)flash(`FX ${FXN[heldFx]} · DÊ PLAY`);break;
   }}
 function padUp(k){if(recSlot===k)stopSampling();if(mode==='fx'&&!fxLatch&&heldFx===k)heldFx=-1}
-function layToggle(s,st){const p=ep();if(st>=p.len)return;const a=p.n[s][st],sl=S.slots[s];
+function layToggle(s,st){const p=ep();if(st>=sComp(p,s))return;const a=p.n[s][st],sl=S.slots[s];
   if(a.length){a.length=0;p.lk[s][st]=null}else{a.push(sl.lastKey);if(!playing&&samples[s])playNow(s,sl.lastKey)}
   S.curSound=s;dirty()}
 
@@ -910,7 +928,7 @@ function act(a){ensureCtx();const cs=S.curSound,sl=S.slots[cs];
   const ix=/^(pt|pm|ps|lN|lM|lS)(\d+)$/.exec(a);
   if(ix){const i=+ix[2],p=ep();switch(ix[1]){
     case 'pt':perfPress(i);break;case 'pm':perfMute(i);break;case 'ps':perfSel=i;break;
-    case 'lN':S.curSound=i;if(samples[i]&&!playing)playNow(i,S.slots[i].lastKey);break;
+    case 'lN':if(S.curSound===i){polyEd=!polyEd;break}S.curSound=i;polyEd=false;if(samples[i]&&!playing)playNow(i,S.slots[i].lastKey);break;
     case 'lM':p.mute[i]=!p.mute[i];dirty();break;
     case 'lS':p.solo[i]=!p.solo[i];dirty();break}return}
   const tr=S.perf.tracks[perfSel];
@@ -958,6 +976,9 @@ function act(a){ensureCtx();const cs=S.curSound,sl=S.slots[cs];
       if(tr.len<8){tr.ev=tr.ev.concat(tr.ev.map(x=>x.map(e=>e.slice())));tr.len*=2}else{tr.len=1;tr.ev.length=16}
       if(tr.st==='ovd'){tr.pass=trSnap(tr);tr.touched=false}flash(`F${perfSel+1} · ${tr.len} COMP${tr.len===1?' · DESF VOLTA':''}`);dirty();break;
     case 'layAll':S.layAll=!S.layAll;dirty();break;
+    case 'polyEd':polyEd=!polyEd;break;
+    case 'pc-':case 'pc+':{const p=ep(),c=Math.max(1,Math.min(64,sComp(p,cs)+(a==='pc+'?1:-1)));p.sc[cs].c=c===p.len?0:c;dirty();break}
+    case 'pd-':case 'pd+':{const p=ep();p.sc[cs].d=Math.max(0,Math.min(6,p.sc[cs].d+(a==='pd+'?1:-1)));dirty();flash(`SOM ${pad(cs+1)} · DIV ${DIVL[p.sc[cs].d]}`);break}
     // perf
     case 'fb-':tr.fb=Math.max(0,tr.fb-5);dirty();break;
     case 'fb+':tr.fb=Math.min(100,tr.fb+5);dirty();break;
@@ -982,6 +1003,7 @@ function ctxHTML(){const cs=S.curSound,sl=S.slots[cs],p=ep();
     case 'play':{const n=undoSt.length+(passTouched?1:0);
       return B('rec',liveRecOn?'● rec':'○ rec',liveRecOn?'rec on':'')+B('rept',S.rept?`rept ${RL[S.rept]}`:'rept',S.rept?'on':'')+B('erase','borracha',eraseOn?'on':'')+B('undo',`desfazer${n?' '+n:''}`)}
     case 'steps':{const np=npages(p),lim=B('clrSnd',conf('clrSnd','limpar'));
+      if(S.layView&&polyEd)return B('pc-','−','sm')+T(`comp ${sComp(p,cs)}`)+B('pc+','+','sm')+B('pd-','‹','sm')+T(DIVL[p.sc[cs].d])+B('pd+','›','sm')+B('polyEd','ok','on');
       if(S.layView)return B('layView','ver: todos','on')+comp+(np>1?fol:'')+lim;
       return B('note-','−','sm')+T(`${cs<8?noteName(sl.lastKey):'fatia '+(sl.lastKey+1)}`)+B('note+','+','sm')+B('layView','ver: 1 som')+comp+(np>1?fol:'')+lim}
     case 'sound':{if(micOn){const t=micState==='ready'?'segure um pad':micState==='asking'?'aceite o mic':micState==='denied'?'mic negado · arquivo':micState==='blocked'?'sem mic · arquivo':'abrindo mic…';return T(t)+B('micRec','sair do mic','on')+B('del',conf('del','apagar'))}
@@ -1005,7 +1027,7 @@ function buildUI(){
     keyEls.push({el,lab:el.querySelector('.l'),num:el.querySelector('.num')})}
   const St=$('strip');
   for(let k=0;k<16;k++){const d=document.createElement('div');St.appendChild(d);stripEls.push(d);
-    d.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();ensureCtx();const st=viewPage()*16+k;if(st<ep().len)toggleStep(st)})}
+    d.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();ensureCtx();const st=viewPage()*16+k;if(st<sComp(ep(),S.curSound))toggleStep(st)})}
   const O=$('ovw');
   for(let i=0;i<4;i++){const d=document.createElement('div');O.appendChild(d);ovwEls.push(d);
     d.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();S.page=i;S.follow=false;dirty()})}
@@ -1059,19 +1081,20 @@ function buildUI(){
 
 /* --- desenho --- */
 const TLB={empty:'REC',rec:'● REC',ovd:'OVD',play:'PLAY'},ALB={rec:'REC',close:'OVD',ovd:'OVD',play:'PLAY',mute:'MUTE'};
-function renderLayers(pat,vs,vp){const cs=S.curSound,full=false,L=pat.len,c0=full?0:vp*16,cn=full?L:16,solo=pat.solo.some(Boolean);
+function renderLayers(pat,vs,vp){const cs=S.curSound,full=false,L=vlen(pat),c0=full?0:vp*16,cn=full?L:16,solo=pat.solo.some(Boolean);
   let shown=0;
   for(let s=0;s<16;s++){const R_=layRows[s];let used=false;for(let i=0;i<L;i++)if(pat.n[s][i].length){used=true;break}
     const show=S.layAll||used||s===cs;setSty(R_.row,'display',show?'':'none');if(!show)continue;shown++;
     const mut=pat.mute[s]||(solo&&!pat.solo[s]);
     setTxt($('lmore'),S.layAll?'só sons usados':'+ mostrar os 16 sons');
     setCls(R_.row,'lrow'+(s===cs?' sel':'')+(mut?' mut':''));
-    setTxt(R_.name,`${pad(s+1)} ${(S.slots[s].name||'—').toUpperCase()}`);
+    const C_=sComp(pat,s),lph=vs>=0?locAt(pat,s,vs):-1;
+    setHTML(R_.name,`<span>${pad(s+1)} ${(S.slots[s].name||'—').toUpperCase()}</span>`+(isPoly(pat,s)?`<small>${C_}·${DIVL[pat.sc[s].d]}</small>`:''));
     setCls(R_.m,'lm'+(pat.mute[s]?' on':''));setCls(R_.so,'ls'+(pat.solo[s]?' on':''));
     setSty(R_.cw,'grid-template-columns',`repeat(${cn},minmax(0,1fr))`);
     for(let i=0;i<64;i++){const c=R_.cells[i];if(i>=cn){setSty(c,'display','none');continue}setSty(c,'display','');
-      const st=c0+i,on=st<L&&pat.n[s][st].length>0;let k=on?'on':(st%4===0?'b':'');
-      if(on&&pat.lk[s][st])k+=' lk';if(st===vs)k+=' ph';if(st>=L)k+=' off';setCls(c,k)}}
+      const st=c0+i,on=st<C_&&pat.n[s][st].length>0;let k=on?'on':(st%4===0?'b':'');
+      if(on&&pat.lk[s][st])k+=' lk';if(st===lph)k+=' ph';if(st>=C_)k+=' off';setCls(c,k)}}
 }
 function renderPerf(){const P=S.perf,cur=playing?visCur:null,tr=P.tracks[perfSel];
   setHTML($('phd'),`<span class="pt">F${perfSel+1}</span><button data-a="fb-" class="sm" aria-label="Feedback menos">−</button><b>FB ${tr.fb}%</b><button data-a="fb+" class="sm" aria-label="Feedback mais">+</button><span class="sp"></span><button data-a="pq">Q ${P.q}</button><button data-a="resamp">reamost.</button>`);
@@ -1096,7 +1119,7 @@ function renderPerf(){const P=S.perf,cur=playing?visCur:null,tr=P.tracks[perfSel
   })}
 function render(){
   const pi=epIdx(),pat=S.patterns[pi],cs=S.curSound,sl=S.slots[cs],now=performance.now(),actx=ctx?ctx.currentTime:0;
-  const vs=playing&&visCur?visCur.real:-1,L=pat.len,vp=viewPage(),np=npages(pat);
+  const vs=playing&&visCur?visCur.real:-1,L=pat.len,vp=viewPage(),np=npages(pat),CL=sComp(pat,cs),lv=vs>=0?locAt(pat,cs,vs):-1;
   const afx=heldFx>=0?heldFx:(playing&&visCur?pat.fx[visCur.real]:-1);curFx=afx;
   const counting=playing&&ctx&&actx<countEnd-.005;
   setTxt($('dSnd'),`SOM ${pad(cs+1)}`);setTxt($('dPat'),`PADRÃO ${pad(pi+1)}·${L}`);setTxt($('dBpm'),`${S.bpm} BPM`);setTxt($('dMem'),`MEM ${(MEM-usedMem()).toFixed(0)}S`);
@@ -1116,12 +1139,12 @@ function render(){
   // visão geral das páginas
   setCls($('ovw'),np>1?'show':'');
   for(let i=0;i<4;i++){const d=ovwEls[i];if(i>=np){setSty(d,'display','none');continue}setSty(d,'display','');
-    let c=0;for(let st=i*16;st<i*16+16;st++)for(let s=0;s<16;s++)if(pat.n[s][st].length){c++;break}
-    setSty(d,'--d',Math.round(c/16*100)+'%');setCls(d,(i===vp?'cur ':'')+(vs>=0&&(vs/16|0)===i?'ph':''))}
+    let c=0;for(let st=i*16;st<i*16+16;st++)for(let s=0;s<16;s++)if(st<sComp(pat,s)&&pat.n[s][st].length){c++;break}
+    setSty(d,'--d',Math.round(c/16*100)+'%');setCls(d,(i===vp?'cur ':'')+(lv>=0&&(lv/16|0)===i?'ph':''))}
   // faixa: som atual cheio, outros sons em tom fraco
   for(let k=0;k<16;k++){const st=vp*16+k;let c='';
-    if(st>=L)c='off';else{if(pat.n[cs][st].length)c+='on ';else{for(let s=0;s<16;s++)if(s!==cs&&pat.n[s][st].length){c+='oth ';break}}
-      if(pat.lk[cs][st]&&pat.n[cs][st].length)c+='lk ';if(st===vs)c+='ph'}
+    if(st>=CL)c='off';else{if(pat.n[cs][st].length)c+='on ';else{for(let s=0;s<16;s++)if(s!==cs&&pat.n[s][st].length){c+='oth ';break}}
+      if(pat.lk[cs][st]&&pat.n[cs][st].length)c+='lk ';if(st===lv)c+='ph'}
     setCls(stripEls[k],c)}
   setTxt($('dFx'),afx>=0?`FX ${FXS[afx]}${fxLatch&&heldFx>=0?' (TRAVADO)':''}`:'');
   setTxt($('dChain'),S.chain.length>1||pendingChain?`CADEIA ${(pendingChain||S.chain).map(x=>x+1).join('›')}${pendingChain?' (PRÓX.)':''}`:'');
@@ -1144,7 +1167,7 @@ function render(){
     switch(mode){
       case 'perf':
       case 'play':{const h=actx-padHit[k];if(h>=0&&h<.12)c+=' hit';if(k===sl.lastKey)c+=' dim';lab=cs<8?noteName(k):'';break}
-      case 'steps':{const st=vp*16+k;num=String(st+1);if(st>=L){c+=' off';break}const n=pat.n[cs][st];if(n.length)c+=' on';if(st===vs)c+=' ph';lab=n.length?(cs<8?noteName(n[0]):'fatia '+(n[0]+1))+(pat.lk[cs][st]?' · trava':''):'';break}
+      case 'steps':{const st=vp*16+k;num=String(st+1);if(st>=CL){c+=' off';break}const n=pat.n[cs][st];if(n.length)c+=' on';if(st===lv)c+=' ph';lab=n.length?(cs<8?noteName(n[0]):'fatia '+(n[0]+1))+(pat.lk[cs][st]?' · trava':''):'';break}
       case 'sound':if(micOn){if(k===recSlot)c+=' ph';if(samples[k])c+=' on';else c+=' empty';if(k===cs)c+=' sel';lab=samples[k]?(samples[k].data.length/samples[k].rate).toFixed(1)+'s':'vazio';break}if(k===cs)c+=' sel';if(!samples[k])c+=' empty';else c+=' on';if(copyArm==='sound'&&k!==cs)c+=' arm';lab=S.slots[k].name||'vazio';break;
       case 'pattern':{if(chainOn){const pos=[];chainBuild.forEach((x,i)=>{if(x===k)pos.push(i+1)});if(pos.length)c+=' on';if(playing&&k===pi)c+=' ph';lab=pos.slice(0,4).join('·')+(pos.length>4?'…':'');break}const has=S.patterns[k].n.some(r=>r.some(x=>x.length));if(has)c+=' on';if(k===pi)c+=' sel';if(copyArm==='pattern'&&k!==pi)c+=' arm';lab=S.chain.includes(k)&&S.chain.length>1?'na cadeia':(has?S.patterns[k].len+' passos':'');break}
       case 'fx':if(k===heldFx)c+=' sel';if(pat.fx.slice(0,L).includes(k))c+=' on';lab=FXS[k];break;
