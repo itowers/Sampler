@@ -114,8 +114,49 @@ T['9.3 polimetria']=async()=>{const N='9.3 polimetria';
   const okWrap=eq(B2,[0,12,24,36,48,60,64,76,88,100,112,124]);
   rec(N,okA&&okB&&okC&&okD&&okWrap&&both[0]===48,`A ${okA?'ok':'errado'} · B ${okB?'ok':'errado'} · 16 sobre 12 coincidem no passo ${both[0]+1} (esperado 49) · 1/8 ${okC?'ok':'errado'} · 1/32 ${okD?'ok':'errado'} · 2ª volta ${okWrap?'ok':'errada'}`)};
 
+T['9.5 ratchet, tie e condições']=async()=>{const N='9.5 ratchet, tie e condições',bad=[];
+  // ratchet 3: 3 ataques no passo, volume caindo 10%
+  reset();useClicks();E(`const p=newPattern();p.len=16;p.n[8][0].push(0);p.lk[8][0]={rat:3};p.n[8][4].push(1);S.patterns[0]=p;`);
+  let r=await render({steps:16,dry:true});const on=onsets(r.buf,.02,.008).filter(t=>t<r.t0+E('stepDur()')*.99);
+  const g=r.ev.filter(e=>e.k===0).map(e=>e.gain);
+  if(on.length!==3)bad.push(`ratchet: ${on.length} ataques`);if(!(g.length===3&&Math.abs(g[1]-.9)<1e-9&&Math.abs(g[2]-.81)<1e-9))bad.push('ratchet: volumes');
+  // tie: passo com tie num som melódico não gera ataque
+  reset();E(`const p=newPattern();p.len=16;p.n[0][0].push(0);p.n[0][2].push(0);p.lk[0][2]={tie:true};p.n[0][4].push(2);S.patterns[0]=p;`);
+  r=await render({steps:16,dry:true});const st0=r.ev.filter(e=>e.s===0).map(e=>Math.round((e.t-r.t0)/E('stepDur()')));
+  if(JSON.stringify(st0)!=='[0,4]')bad.push(`tie: passos ${st0}`);
+  // condições em 6 voltas
+  reset();E(`const p=newPattern();p.len=16;[1,2,3,5,6].forEach((c,i)=>{p.n[8][i].push(i);p.lk[8][i]={cd:c}});S.patterns[0]=p;fillOn=false;`);
+  r=await render({steps:96,dry:true});const cyc=k=>r.ev.filter(e=>e.k===k).map(e=>Math.floor((e.t-r.t0)/(16*E('stepDur()')))+1);
+  const J=x=>JSON.stringify(x);
+  if(J(cyc(0))!=='[1,3,5]')bad.push(`1:2 tocou nas voltas ${cyc(0)}`);if(J(cyc(1))!=='[2,4,6]')bad.push(`2:2 tocou nas voltas ${cyc(1)}`);
+  if(J(cyc(2))!=='[1,5]')bad.push(`1:4 tocou nas voltas ${cyc(2)}`);if(cyc(3).length)bad.push('FILL tocou sem fill');if(cyc(4).length!==6)bad.push('!FILL faltou');
+  E('fillOn=true');r=await render({steps:32,dry:true});E('fillOn=false');
+  if(r.ev.filter(e=>e.k===3).length!==2)bad.push('FILL não tocou com fill');if(r.ev.filter(e=>e.k===4).length)bad.push('!FILL tocou com fill');
+  // 50%: o sorteio anotado na fila bate com o que soou
+  reset();E(`const p=newPattern();p.len=16;for(let i=0;i<16;i++){p.n[8][i].push(0);p.lk[8][i]={cd:4}}S.patterns[0]=p;`);
+  r=await render({steps:64,dry:true});const yes=r.steps.reduce((a,x)=>a+Object.values(x.dice).filter(Boolean).length,0);
+  if(yes!==r.ev.length)bad.push(`50%: fila ${yes} ≠ tocou ${r.ev.length}`);
+  // micro: +20% atrasa 0,2 passo; −30% adianta
+  reset();useClicks();E(`const p=newPattern();p.len=16;p.n[8][4].push(0);p.lk[8][4]={mi:.2};p.n[8][8].push(1);p.lk[8][8]={mi:-.3};S.patterns[0]=p;`);
+  r=await render({steps:16,dry:true});const d=E('stepDur()'),o=onsets(r.buf);
+  const em=Math.max(Math.abs(o[0]-(r.t0+4.2*d)),Math.abs(o[1]-(r.t0+7.7*d)));if(!(o.length===2&&em<.001))bad.push(`micro: erro ${ms(em)}`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`ratchet 3 = 3 ataques (100/90/81%) · tie sem ataque · 1:2, 2:2, 1:4, FILL, !FILL e 50% certos (${yes}/64) · micro ±1 ms`)};
+
+T['9.6 latência']=async()=>{const N='9.6 latência';
+  reset();const d=E('ensureCtx();S.bpm=240;stepDur()');   // 240 BPM: passo de 62,5 ms, 40 ms de atraso já cai no passo seguinte
+  E(`sched=[];for(let i=0;i<8;i++)sched.push({time:10+i*${d},real:i,step:i,pat:0,g:i,dice:{}});S.latAdj=0;`);
+  const pick=(lat,t)=>E(`TST.fakeLat=${lat};nearest(touchT(${t})).real`);
+  let okC=0,okN=0,n=0;
+  for(let i=1;i<7;i++)for(const j of [-.02,0,.02]){n++;const t=10+i*d+.04+j;if(pick(.04,t)===i)okC++;if(pick(0,t)===i)okN++}
+  // ajuste calibrado soma à latência do sistema
+  E('S.latAdj=40');const adj=pick(0,10+3*d+.04+.02)===3;E('S.latAdj=0;TST.fakeLat=null;sched=[]');
+  // calibração: mediana dos erros
+  const cal=E(`(()=>{const c=[0,.5,1,1.5,2,2.5,3,3.5,4],t=[.031,.52,1.028,1.535,2.03,2.54,3.025,3.6,4.03];const e=calibErrs(c,t).sort((a,b)=>a-b);return Math.round(e[e.length>>1]*1000)})()`);
+  rec(N,okC===n&&okN<n&&adj&&cal===30,`240 BPM, latência de 40 ms: ${okC}/${n} toques no passo certo (sem compensar seriam ${okN}/${n}) · ajuste calibrado ${adj?'ok':'errado'} · mediana da calibração ${cal} ms (esperado 30)`)};
+
 /* persistência: cada fase acrescenta campos em PERSIST (expressão que monta, expressão que confere) */
 const PERSIST=[
+  ['passo rico e calibração',`S.patterns[2].lk[3][7]={rat:3,mi:-.2,cd:4,tie:true};S.latAdj=-23`,`JSON.stringify(S.patterns[2].lk[3][7])==='{"rat":3,"mi":-0.2,"cd":4,"tie":true}'&&S.latAdj===-23`],
   ['comp/div por som',`S.patterns[2].sc[5]={c:12,d:2}`,`S.patterns[2].sc[5].c===12&&S.patterns[2].sc[5].d===2`],
 ];
 T['9.9 persistência']=async()=>{const N='9.9 persistência';
