@@ -94,11 +94,12 @@ T['9.10 orçamento de CPU']=async()=>{
     for(let i=0;i<16;i++)invalidate(i);
     const p=newPattern();p.len=64;for(let s=0;s<16;s++)for(let st=0;st<64;st++)if((st+s)%2===0)p.n[s][st].push((st+s)%8);
     for(let st=0;st<64;st++)p.fx[st]=[-1,8,4,9,6,-1,10,14][st%8];
-    if(typeof p.lk[0][0]!=='undefined')for(let st=0;st<64;st+=4)p.lk[3][st]={rat:3};
+    for(let st=0;st<64;st+=4)p.lk[3][st]={rat:3};for(let st=2;st<64;st+=8)p.mx[st]={dj:.2};
+    S.mix.dp=.7;S.mix.du=.5;S.mix.dj=.7;S.slots[0].ins={t:1,a:.5};S.slots[8].ins={t:2,a:.5};S.slots[2].ins={t:3,a:.5};
     S.patterns[0]=p;S.chain=[0];S.curPattern=0;`);
   const t=performance.now(),r=await render({steps:128}),wall=(performance.now()-t)/1000,dur=r.buf.duration,pc=wall/dur*100;
   window.CPU={wall,dur,pc};
-  rec('9.10 orçamento de CPU',pc<25,`8 compassos com 16 sons e FX: render ${wall.toFixed(2)}s para ${dur.toFixed(1)}s de áudio = ${pc.toFixed(1)}% (limite 25%)`)};
+  rec('9.10 orçamento de CPU',pc<25,`8 compassos com 16 sons, ratchets, FX, DUCK, DJ, DUST e INSERTs: render ${wall.toFixed(2)}s para ${dur.toFixed(1)}s de áudio = ${pc.toFixed(1)}% (limite 25%)`)};
 
 T['9.3 polimetria']=async()=>{const N='9.3 polimetria';
   reset();useClicks(8);useClicks(9);E(`const p=newPattern();p.len=64;p.n[8][0].push(0);p.sc[8].c=16;p.n[9][0].push(1);p.sc[9].c=12;
@@ -154,9 +155,28 @@ T['9.6 latência']=async()=>{const N='9.6 latência';
   const cal=E(`(()=>{const c=[0,.5,1,1.5,2,2.5,3,3.5,4],t=[.031,.52,1.028,1.535,2.03,2.54,3.025,3.6,4.03];const e=calibErrs(c,t).sort((a,b)=>a-b);return Math.round(e[e.length>>1]*1000)})()`);
   rec(N,okC===n&&okN<n&&adj&&cal===30,`240 BPM, latência de 40 ms: ${okC}/${n} toques no passo certo (sem compensar seriam ${okN}/${n}) · ajuste calibrado ${adj?'ok':'errado'} · mediana da calibração ${cal} ms (esperado 30)`)};
 
+T['9.7 DUCK e limitador']=async()=>{const N='9.7 DUCK e limitador',bad=[];
+  // tom constante no som 2, gatilho silencioso no som 10: a saída mostra só o ganho do barramento
+  reset();A.__tone=(()=>{const r=44100,d=new Float32Array(r*3);for(let i=0;i<d.length;i++)d[i]=.4*Math.sin(2*Math.PI*220*i/r);return d})();
+  E(`samples[1]={data:window.__tone,rate:44100};invalidate(1);S.slots[1]=newSlot('tom');samples[9]={data:new Float32Array(44100),rate:44100};invalidate(9);S.slots[9]=newSlot('mudo');
+    S.mix.dp=1;S.mix.ds=150;S.mix.dk={s:9,k:0};const p=newPattern();p.len=16;p.n[1][0].push(0);p.n[9][4].push(0);S.patterns[0]=p;`);
+  const r=await render({steps:16,bare:true}),b=r.buf.getChannelData(0),sr=r.buf.sampleRate,d=E('stepDur()'),tk=r.t0+4*d;
+  const rms=(a,z)=>{let s=0,n=0;for(let i=Math.round(a*sr);i<Math.round(z*sr);i++){s+=b[i]*b[i];n++}return Math.sqrt(s/n)};
+  const db=x=>20*Math.log10(Math.max(x,1e-9)),ref=rms(tk-.2,tk-.02),dip=db(rms(tk+.003,tk+.010)/ref),back=db(rms(tk+.15,tk+.165)/ref);
+  if(!(dip<-20))bad.push(`duck só ${dip.toFixed(1)} dB`);if(!(back>-1))bad.push(`não voltou: ${back.toFixed(1)} dB após 150 ms`);
+  // limitador: 16 sons no máximo, volume 16
+  reset();E(`for(const i of [6,7]){samples[i]=samples[i-6]}for(const i of [12,13,14,15]){samples[i]=samples[i-4]}for(let i=0;i<16;i++){invalidate(i);S.slots[i].params.v=1;S.slots[i].slices=defSlices()}
+    S.vol=16;const p=newPattern();p.len=16;for(let s=0;s<16;s++)for(let st=0;st<16;st+=2)p.n[s][st].push(s<8?0:st%4);S.patterns[0]=p;`);
+  const r2=await render({steps:32}),c=r2.buf.getChannelData(0);let pk=0;for(let i=0;i<c.length;i++)pk=Math.max(pk,Math.abs(c[i]));
+  // sem limitador, o mesmo trecho passaria disso
+  const r3=await render({steps:32,bare:true}),c3=r3.buf.getChannelData(0);let pk3=0;for(let i=0;i<c3.length;i++)pk3=Math.max(pk3,Math.abs(c3[i]));
+  const pdb=db(pk);if(!(pdb<=-.5))bad.push(`pico ${pdb.toFixed(2)} dBFS`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`duck 100%: ${dip.toFixed(1)} dB logo depois do gatilho, ${back.toFixed(2)} dB após 150 ms · 16 sons no máximo: pico ${pdb.toFixed(2)} dBFS (sem limitador ${db(pk3).toFixed(1)} dBFS)`)};
+
 /* persistência: cada fase acrescenta campos em PERSIST (expressão que monta, expressão que confere) */
 const PERSIST=[
   ['passo rico e calibração',`S.patterns[2].lk[3][7]={rat:3,mi:-.2,cd:4,tie:true};S.latAdj=-23`,`JSON.stringify(S.patterns[2].lk[3][7])==='{"rat":3,"mi":-0.2,"cd":4,"tie":true}'&&S.latAdj===-23`],
+  ['mix e INSERT',`S.mix.dp=.6;S.mix.dj=.3;S.mix.dk={s:9,k:2};S.slots[4].ins={t:2,a:.7};S.patterns[2].mx[5]={dj:.8}`,`S.mix.dp===.6&&S.mix.dj===.3&&S.mix.dk.s===9&&S.slots[4].ins.t===2&&S.patterns[2].mx[5].dj===.8`],
   ['comp/div por som',`S.patterns[2].sc[5]={c:12,d:2}`,`S.patterns[2].sc[5].c===12&&S.patterns[2].sc[5].d===2`],
 ];
 T['9.9 persistência']=async()=>{const N='9.9 persistência';
@@ -167,7 +187,7 @@ T['9.9 persistência']=async()=>{const N='9.9 persistência';
   const bad=PERSIST.filter(([,,chk])=>{try{return !E(chk)}catch(e){return true}}).map(x=>x[0]);
   E(`S=window.__keep`);
   // padrão salvo antes destas mudanças (sem os campos novos) abre sem erro
-  let old=true;try{E(`const o=JSON.parse(JSON.stringify(S));o.patterns.forEach(p=>{delete p.sc});for(const sl of o.slots){delete sl.ins;delete sl.marks}const m=migrate(o);if(!m.patterns.every(p=>p.sc&&p.sc.length===16))throw 0`)}catch(e){old=false}
+  let old=true;try{E(`const o=JSON.parse(JSON.stringify(S));o.patterns.forEach(p=>{delete p.sc});delete o.mix;o.patterns.forEach(p=>{delete p.mx});for(const sl of o.slots){delete sl.ins;delete sl.marks}const m=migrate(o);if(!m.patterns.every(p=>p.sc&&p.sc.length===16&&p.mx))throw 0;if(!m.mix||!m.slots[0].ins)throw 0`)}catch(e){old=false}
   rec(N,!bad.length&&old,bad.length?`não voltou: ${bad.join(', ')}`:`${PERSIST.length} grupos de dados voltaram · formato antigo abre ${old?'ok':'COM ERRO'}`)};
 
 /* testes registrados pelas fases seguintes */
