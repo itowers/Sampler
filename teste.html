@@ -173,10 +173,28 @@ T['9.7 DUCK e limitador']=async()=>{const N='9.7 DUCK e limitador',bad=[];
   const pdb=db(pk);if(!(pdb<=-.5))bad.push(`pico ${pdb.toFixed(2)} dBFS`);
   rec(N,!bad.length,bad.length?bad.join(' · '):`duck 100%: ${dip.toFixed(1)} dB logo depois do gatilho, ${back.toFixed(2)} dB após 150 ms · 16 sons no máximo: pico ${pdb.toFixed(2)} dBFS (sem limitador ${db(pk3).toFixed(1)} dBFS)`)};
 
+T['9.8 CHOP']=async()=>{const N='9.8 CHOP',bad=[];
+  // 8 ataques conhecidos (ruído e tons com decaimento) sobre um fundo fraco
+  const r=44100,len=r*4,d=new Float32Array(len),at=[.12,.61,.93,1.47,1.81,2.36,2.84,3.41];let sd=7;const rn=()=>((sd=(sd*16807)%2147483647)/2147483647)*2-1;
+  for(let i=0;i<len;i++)d[i]=.002*rn();
+  at.forEach((t,j)=>{const o=Math.round(t*r);for(let i=0;i<r*.25&&o+i<len;i++){const e=Math.exp(-i/(r*.06)),x=j%2?Math.sin(2*Math.PI*(120+60*j)*i/r):rn();d[o+i]+=(.3+.08*j)*e*x}});
+  A.__chop=d;const fr=E(`detectAttacks(window.__chop,${r},.5)`).filter(x=>x>.005).map(x=>x*len/r);
+  if(fr.length!==8)bad.push(`${fr.length} fatias (esperava 8)`);
+  const err=fr.length===8?Math.max(...fr.map((t,i)=>Math.abs(t-at[i]))):1;if(err>.005)bad.push(`erro ${ms(err)}`);
+  // distribuir: começo + 8 ataques viram pads 1–9 (e repetem nos seguintes)
+  reset();E(`samples[2]={data:window.__chop,rate:${r}};S.slots[2]=newSlot('loop');S.curSound=2;setMode('sound');chopStart();chopAttacks();chopDistribute()`);
+  const to=E('S.curSound'),sl=E(`S.slots[${to}].slices.map(x=>x.st)`);
+  if(to<8)bad.push('distribuir não foi para um som de bateria');
+  else if(sl.slice(1,9).some((x,i)=>Math.abs(x*len/r-at[i])>.005))bad.push('fatias fora do lugar');   // pad 1 = começo da amostra, pads 2–9 = ataques
+  // grade 4
+  E(`S.curSound=2;chopStart();S.chopGrid=4;chopGrid()`);const g=E('chopMarks().slice()');if(JSON.stringify(g)!=='[0,0.25,0.5,0.75]')bad.push('grade 4 errada');E('chopExit()');
+  rec(N,!bad.length,bad.length?bad.join(' · '):`8 ataques achados, erro máx ${ms(err)} (limite 5 ms) · distribuídos no som ${to+1} · grade ok`)};
+
 /* persistência: cada fase acrescenta campos em PERSIST (expressão que monta, expressão que confere) */
 const PERSIST=[
   ['passo rico e calibração',`S.patterns[2].lk[3][7]={rat:3,mi:-.2,cd:4,tie:true};S.latAdj=-23`,`JSON.stringify(S.patterns[2].lk[3][7])==='{"rat":3,"mi":-0.2,"cd":4,"tie":true}'&&S.latAdj===-23`],
   ['mix e INSERT',`S.mix.dp=.6;S.mix.dj=.3;S.mix.dk={s:9,k:2};S.slots[4].ins={t:2,a:.7};S.patterns[2].mx[5]={dj:.8}`,`S.mix.dp===.6&&S.mix.dj===.3&&S.mix.dk.s===9&&S.slots[4].ins.t===2&&S.patterns[2].mx[5].dj===.8`],
+  ['marcas do CHOP',`S.slots[3].marks=[0,.25,.6]`,`JSON.stringify(S.slots[3].marks)==='[0,0.25,0.6]'`],
   ['comp/div por som',`S.patterns[2].sc[5]={c:12,d:2}`,`S.patterns[2].sc[5].c===12&&S.patterns[2].sc[5].d===2`],
 ];
 T['9.9 persistência']=async()=>{const N='9.9 persistência';
