@@ -37,3 +37,16 @@ o que toca
 ## Helpers
 
 `stp(p,s,i)` passo · `nk` teclas · `hasN` tem nota · `stpMk` cria · `addK`/`delK` põe/tira tecla · `delSt` apaga passo · `fxAt`/`djAt`/`fxSet` trilha FX · `chainOf([padrões])` monta cadeia · `cenaFor(p,l)` acha ou cria cena · `chainTxt` texto do visor.
+
+## Versão 3: notas de melodia em semitons
+
+Até a versão 2, a tecla de um som 1–8 era um índice da escala maior (`SCALE[k]`, 0–15). Isso não guarda notas fora da escala, como o Bb do C7. Na versão 3:
+
+```
+passo (sons 1–8) = { k:[semitons], …, cm }   0 = afinação da amostra (C3); cm = componente melódico {t:'q'|'ru'|'rd'|'gl'|'j'|'tn', n, v}
+padrão           = { len, key, sc, tr[16], fx }   tom (0–11) e escala do teclado
+instr            = { …, inv, oct, sty, ton, lastCh }   inversão, oitava, estilo (Acorde/Strum/Arp/Nota), segue/ignora a PROG, último acorde
+projeto          = { …, prog (som que conduz a harmonia, −1 = nenhum), arp {v, o, r, a} }
+```
+
+`migrate()` converte `k → SCALE[k]` nas trilhas 0–7 dos padrões e dos loops, no `lastKey` dos sons 1–8 e no gatilho do DUCK quando ele é um som de melodia. A bateria (9–16) não muda. Os testes 9.11 e 11.1 migram projetos v1 e v2 e conferem que o áudio sai igual à referência.

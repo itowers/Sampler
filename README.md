@@ -4,7 +4,11 @@ Sampler e sequenciador de bolso inspirado no Pocket Operator PO-33. É um único
 
 ## Recursos
 
-- 16 sons: 1–8 melódicos (escala), 9–16 bateria (16 fatias). Vem com sons e kits sintetizados pelo próprio app.
+- 16 sons: 1–8 de melodia, 9–16 de batida e amostras (16 fatias). Vem com sons e kits sintetizados pelo próprio app.
+- **Melodia no teclado, batida nos pads.** Os sons 1–8 tocam num teclado de 7 acordes no estilo do [DuoSynth](https://github.com/itowers/DuoSynth): os 7 graus do tom, joystick de 8 variações que trava (troca maior/menor, 7, maj7, 9, sus4, 6/sus2, dim, aug), estilos Acorde, Strum, Arp e Nota (no Nota o joystick muda oitava e semitom), tom e escala por padrão (8 escalas), inversão e oitava por som. REC ao vivo e Passos gravam o acorde inteiro no passo. Os sons 9–16 continuam nos 16 pads.
+- Arp no tempo do BPM: 1/4 a 1/32 e tercina, ordem (manual, ↑, ↓, ↑↓, ↓↑, aleatória), 6 ritmos e alcance de 1 a 4 oitavas. Grava no padrão com REC.
+- Progressão (ideia do OP-Z): um som marcado como PROG conduz a harmonia e os outros sons de melodia transpõem as notas pelo acorde que está tocando (ou ignoram).
+- Componentes de passo melódicos (ideia do OP-Z): quebra de acorde, rampa de escala ↑/↓, glide, salto (volta ao passo 1 ou pula ao acaso) e tonal por passo.
 - Sequenciador de 16 passos, 16 padrões, cadeia de cenas (padrão + loops, com repetição ×N), swing e TAP.
 - Gravação por passos e ao vivo (quantizada), com travas de parâmetro por passo. REC parado faz contagem de 1 compasso; cada volta soma notas (overdub) e dá para desfazer volta a volta. Repetição de nota (1/8, 1/16, 1/32) e borracha.
 - Metrônomo (desligado, só gravando ou sempre), com volume e contagem no menu.
@@ -22,21 +26,21 @@ Sampler e sequenciador de bolso inspirado no Pocket Operator PO-33. É um único
 - Visual de ferrofluido em WebGL, que reage a pads, BPM, volume, afinação, filtro e efeitos.
 - Interface clara com teclas em relevo e 6 modos (Tocar, Passos, Som, Padrão, FX, Perf), sem funções escondidas; volume, visual e ajuda ficam no menu ⋯, que se ajusta à altura da tela (celular, dobrável, tablet).
 
-## Modelo de dados (versão 2)
+## Modelo de dados (versão 3)
 
 ```
 aparelho  = { latência calibrada, fade }            fica no aparelho, fora do projeto e do backup
-projeto   = { v:2, instr[16], patterns[16], cenas[], chain[], loops[4], bpm, swing, mix… }
-padrão    = { len, tr[16], fx }                      a trilha s toca o instrumento s
+projeto   = { v:3, instr[16], patterns[16], cenas[], chain[], loops[4], prog, arp, bpm, swing, mix… }
+padrão    = { len, key, sc, tr[16], fx }             tom e escala do teclado · a trilha s toca o instrumento s
 trilha    = { c, d, m, so, p:{ índice: passo } }     comp, divisão, mute, solo; só passos com conteúdo
-passo     = { k:[teclas], l:{trava}, rat, mi, cd, tie }
+passo     = { k:[teclas], l:{trava}, rat, mi, cd, tie, cm }   sons 1–8: tecla = semitom (0 = C3); cm = componente melódico
 passo FX  = { fx, dj }                               efeito e filtro DJ travado no passo
 loop PERF = { len, tr[16], st, mute, fb, … }         mesmas trilhas do padrão (+ ganho por nota)
 cena      = { p, l }                                 padrão + quais loops tocam (null = não mexe)
 cadeia    = [{ c: cena, x: vezes }]
 ```
 
-Projetos salvos no formato antigo (versão 1) são convertidos ao abrir e tocam igual. `docs/modelo-dados.md` explica a mudança.
+Projetos salvos nos formatos antigos (versões 1 e 2) são convertidos ao abrir e tocam igual. Na versão 3, as notas dos sons 1–8 passam de índice da escala maior a semitom, para guardar acordes com notas fora da escala. `docs/modelo-dados.md` explica a mudança.
 
 Padrões e sons ficam salvos no navegador (IndexedDB). No menu (⋯), **Exportar backup** gera um arquivo `.json` com todos os sons e padrões (no iPhone abre a folha de compartilhar, para salvar em Arquivos), e **Importar backup** restaura esse arquivo, substituindo tudo.
 
@@ -52,7 +56,7 @@ No iPhone, sons e padrões do app instalado ficam separados dos que você salvou
 - `manifest.webmanifest`, `sw.js`, `icons/`: instalação como PWA e uso offline.
 - `docs/prompt-sequenciador.md`: prompt para levar o modelo de gravar, tocar e sequenciar a outro synth.
 - `docs/modelo-dados.md`: o modelo de dados da versão 2 e a migração a partir da versão 1.
-- `teste.html`: testes automáticos (timing, polimetria, passo rico, latência, mix, CHOP, migração v1 → v2, persistência, CPU). Abra no navegador e toque em "Rodar testes"; usa um banco de dados separado e não mexe nos seus sons. `testes/golden.json` guarda a referência de áudio por navegador (gere com `teste.html?atualizar=1`).
+- `teste.html`: testes automáticos (timing, polimetria, passo rico, latência, mix, CHOP, migração v1/v2 → v3, acordes, progressão, componentes melódicos, arp, persistência, CPU). Abra no navegador e toque em "Rodar testes"; usa um banco de dados separado e não mexe nos seus sons. `testes/golden.json` guarda a referência de áudio por navegador (gere com `teste.html?atualizar=1`).
 
 ## Limitações
 

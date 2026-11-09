@@ -49,7 +49,7 @@ function useClicks(slot=8){A.__ck=clickKit();E(`samples[${slot}]={data:window.__
 function goldenSetup(){reset();E(`S.bpm=120;S.swing=30;S.vol=8;
   const p=newPattern();p.len=16;const k=(s,st,key)=>addK(p,s,st,key);
   [0,4,8,12].forEach(i=>k(8,i,0));[4,12].forEach(i=>k(8,i,2));for(let i=0;i<16;i+=2)k(8,i,5);k(8,7,5);k(8,15,7);
-  [0,3,6,8,10,11,14].forEach((i,j)=>k(0,i,[0,0,7,4,3,4,2][j]));TL(p,0,8,{f:.25,r:.4});
+  [0,3,6,8,10,11,14].forEach((i,j)=>k(0,i,SCALE[[0,0,7,4,3,4,2][j]]));TL(p,0,8,{f:.25,r:.4});   // sons 1–8: semitom (versão 3)
   S.patterns[0]=p;S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;`)}
 /* impressão digital: RMS em blocos de 5 ms ×1000, arredondado. O render offline do Chrome varia ~1e-6 entre execuções,
    então um SHA exato do áudio não é estável; a impressão compara com tolerância de 2/1000. */
@@ -93,7 +93,7 @@ T['9.4 jitter do relógio']=async()=>{
 T['9.10 orçamento de CPU']=async()=>{
   reset();E(`for(const i of [6,7]){samples[i]=samples[i-6];S.instr[i].name='cópia'}for(const i of [12,13,14,15]){samples[i]=samples[i-4];S.instr[i].slices=defSlices()}
     for(let i=0;i<16;i++)invalidate(i);
-    const p=newPattern();p.len=64;for(let s=0;s<16;s++)for(let st=0;st<64;st++)if((st+s)%2===0)addK(p,s,st,(st+s)%8);
+    const p=newPattern();p.len=64;for(let s=0;s<16;s++)for(let st=0;st<64;st++)if((st+s)%2===0)addK(p,s,st,s<8?SCALE[(st+s)%8]:(st+s)%8);
     for(let st=0;st<64;st++){const f=[-1,8,4,9,6,-1,10,14][st%8];if(f>=0)fxSet(p,st,'fx',f)}
     for(let st=0;st<64;st+=4)TL(p,3,st,{rat:3});for(let st=2;st<64;st+=8)fxSet(p,st,'dj',.2);
     S.mix.dp=.7;S.mix.du=.5;S.mix.dj=.7;S.instr[0].ins={t:1,a:.5};S.instr[8].ins={t:2,a:.5};S.instr[2].ins={t:3,a:.5};
@@ -206,7 +206,7 @@ T['extra · loop livre e textura']=async()=>{const N='extra · loop livre e text
   rec(N,!bad.length,bad.length?bad.join(' · '):`BPM pelo loop: 2 s → 120, 1,6 s → 150, 5,5 s → ${c.n} comp a ${c.bpm} · notas quantizadas nos passos 1, 5, 9 · loop da textura sem salto (${j.toFixed(3)})`)};
 
 /* migração 1 → 2: um projeto salvo no formato antigo abre no formato novo e toca igual à referência */
-T['9.11 migração v1 → v2']=async()=>{const N='9.11 migração v1 → v2',bad=[];
+T['9.11 migração v1 → v3']=async()=>{const N='9.11 migração v1 → v3',bad=[];
   reset();E(`(()=>{const v1p=()=>({len:16,sc:Array.from({length:16},()=>({c:0,d:1})),mx:Array(64).fill(null),n:Array.from({length:16},()=>Array.from({length:64},()=>[])),lk:Array.from({length:16},()=>Array(64).fill(null)),fx:Array(64).fill(-1),mute:Array(16).fill(false),solo:Array(16).fill(false)});
     const p=v1p(),k=(s,st,key)=>p.n[s][st].push(key);
     [0,4,8,12].forEach(i=>k(8,i,0));[4,12].forEach(i=>k(8,i,2));for(let i=0;i<16;i+=2)k(8,i,5);k(8,7,5);k(8,15,7);
@@ -217,16 +217,16 @@ T['9.11 migração v1 → v2']=async()=>{const N='9.11 migração v1 → v2',bad
       perf:{q:'comp',tracks:[{len:1,ev:Object.assign(Array(16).fill(null).map(()=>[]),{2:[[8,1,.5,0]]}),st:'play',mute:false,fb:80,layers:2}]}};
     window.__keep=S;S=migrate(JSON.parse(JSON.stringify(o)))})()`);
   const c=E(`(()=>{const a=S.patterns[1],x=a.tr[1].p[3],L=S.loops[0].tr[8].p[2];return {v:S.v,instr:Array.isArray(S.instr)&&!S.slots,
-    rich:!!x&&x.rat===3&&x.l&&x.l.f===.2&&!('rat' in x.l),fx:fxAt(a,5)===8&&djAt(a,6)===.3,tr:a.tr[1].c===12&&a.tr[1].d===2&&a.tr[2].m===true,
+    rich:!!x&&x.rat===3&&x.l&&x.l.f===.2&&!('rat' in x.l)&&x.k[0]===4,fx:fxAt(a,5)===8&&djAt(a,6)===.3,tr:a.tr[1].c===12&&a.tr[1].d===2&&a.tr[2].m===true,
     chain:chainTxt(S.chain),loop:!!L&&L.k[0]===1&&L.g[0]===.5&&S.loops.length===4&&S.loops[0].fb===80,dev:DEV.latAdj===-17&&DEV.fade===14&&!('latAdj' in S)&&!('fade' in S.mix),
     sparse:Object.keys(S.patterns[0].tr[8].p).length}})()`);
-  if(c.v!==2)bad.push('versão '+c.v);if(!c.instr)bad.push('instr');if(!c.rich)bad.push('passo rico fora da trava');if(!c.fx)bad.push('trilha FX');
+  if(c.v!==3)bad.push('versão '+c.v);if(!c.instr)bad.push('instr');if(!c.rich)bad.push('passo rico fora da trava');if(!c.fx)bad.push('trilha FX');
   if(!c.tr)bad.push('comp/div/mute na trilha');if(c.chain!=='1×2›2')bad.push('cadeia '+c.chain);if(!c.loop)bad.push('loop PERF');if(!c.dev)bad.push('aparelho');
   let g={};try{g=await (await fetch('testes/golden.json',{cache:'no-store'})).json()}catch(e){}
   const ref=g[engine]&&g[engine].fp;let md=-1;
   if(ref){E('S.chain=chainOf([0]);S.curPattern=0;S.loops=newLoops();DEV=DEVDEF()');const f=fingerprint((await render({steps:32})).buf);md=0;if(f.length!==ref.length)md=999;else for(let i=0;i<f.length;i++)md=Math.max(md,Math.abs(f[i]-ref[i]));if(md>2)bad.push(`áudio do padrão migrado mudou (${md}/1000)`)}
   E('S=window.__keep');
-  rec(N,!bad.length,bad.length?bad.join(' · '):`versão 2 · passo rico fora da trava · trilha FX · cadeia ${c.chain} · loop PERF · aparelho separado · ${c.sparse} passos guardados de 64 · áudio ${md<0?'sem referência':'igual à referência ('+md+'/1000)'}`)};
+  rec(N,!bad.length,bad.length?bad.join(' · '):`versão 3 · notas de melodia em semitons · passo rico fora da trava · trilha FX · cadeia ${c.chain} · loop PERF · aparelho separado · ${c.sparse} passos guardados de 64 · áudio ${md<0?'sem referência':'igual à referência ('+md+'/1000)'}`)};
 
 /* persistência: cada fase acrescenta campos em PERSIST (expressão que monta, expressão que confere) */
 const PERSIST=[
@@ -235,6 +235,8 @@ const PERSIST=[
   ['cenas e cadeia',`S.cenas=[];S.chain=chainOf([0,0,2]);S.chain.push({c:cenaFor(1,[true,false,true,false]),x:2})`,`chainTxt(S.chain)==='1×2›3›2+F13×2'&&S.cenas.length===3`],
   ['marcas do CHOP',`S.instr[3].marks=[0,.25,.6]`,`JSON.stringify(S.instr[3].marks)==='[0,0.25,0.6]'`],
   ['textura',`S.tex={s:5,vol:.3,f:.4,frz:false}`,`S.tex.s===5&&S.tex.vol===.3&&S.tex.f===.4`],
+  ['teclado e progressão',`const p=S.patterns[2];p.key=5;p.sc=1;Object.assign(S.instr[2],{inv:1,oct:-1,sty:2,ton:'ign',lastCh:[5,9,12]});S.prog=3;S.arp={v:4,o:2,r:3,a:3};addNs(p,1,9,[0,4,7,11]);TL(p,1,9,{cm:{t:'q',n:6}})`,
+    `(p=>p.key===5&&p.sc===1&&S.instr[2].inv===1&&S.instr[2].oct===-1&&S.instr[2].sty===2&&S.instr[2].ton==='ign'&&S.instr[2].lastCh.join()==='5,9,12'&&S.prog===3&&S.arp.v===4&&S.arp.a===3&&p.tr[1].p[9].k.join()==='0,4,7,11'&&p.tr[1].p[9].cm.n===6)(S.patterns[2])`],
   ['comp/div, mute e solo',`Object.assign(S.patterns[2].tr[5],{c:12,d:2,m:true,so:true})`,`(t=>t.c===12&&t.d===2&&t.m&&t.so)(S.patterns[2].tr[5])`],
 ];
 T['9.9 persistência']=async()=>{const N='9.9 persistência';
@@ -250,6 +252,88 @@ T['9.9 persistência']=async()=>{const N='9.9 persistência';
   // padrão salvo antes destas mudanças (sem os campos novos) abre sem erro
   let old=true;try{E(`const o=JSON.parse(JSON.stringify(S));delete o.mix;o.patterns.forEach(p=>{delete p.fx;p.tr.forEach(t=>{delete t.c;delete t.m})});for(const sl of o.instr){delete sl.ins;delete sl.marks}const m=migrate(o);if(!m.patterns.every(p=>p.fx&&p.tr.every(t=>t.c===0&&t.m===false)))throw 0;if(!m.mix||!m.instr[0].ins)throw 0`)}catch(e){old=false}
   rec(N,!bad.length&&old,bad.length?`não voltou: ${bad.join(', ')}`:`${PERSIST.length} grupos de dados voltaram · formato antigo abre ${old?'ok':'COM ERRO'}`)};
+
+/* ---------- teclado de melodia (proposta-teclado-melodia) ---------- */
+T['11.1 migração v2 → v3']=async()=>{const N='11.1 migração v2 → v3',bad=[];
+  // o padrão de referência no formato v2 (tecla = índice da escala) migra para semitons e soa igual
+  goldenSetup();E(`(()=>{const o=JSON.parse(JSON.stringify(S));o.v=2;const T0=o.patterns[0].tr[0].p;for(const i in T0)T0[i].k=T0[i].k.map(k=>SCALE.indexOf(k));
+    o.patterns[1].tr[2].p[3]={k:[1,7]};o.patterns[1].tr[9].p[3]={k:[1,7]};o.instr[2].lastKey=4;o.mix.dk={s:3,k:2};
+    o.loops[0].tr[1].p[5]={k:[3],g:[1],nw:[0]};o.loops[0].len=1;o.loops[0].st='play';window.__keep=S;S=migrate(o)})()`);
+  const c=E(`({v:S.v,mel:S.patterns[1].tr[2].p[3].k.join(),drum:S.patterns[1].tr[9].p[3].k.join(),lk:S.instr[2].lastKey,dk:S.mix.dk.k,loop:S.loops[0].tr[1].p[5].k.join(),ref:S.patterns[0].tr[0].p[6].k.join(),again:migrate(JSON.parse(JSON.stringify(S))).patterns[1].tr[2].p[3].k.join()})`);
+  if(c.v!==3)bad.push('versão '+c.v);if(c.mel!=='2,12')bad.push('melodia '+c.mel);if(c.drum!=='1,7')bad.push('bateria mudou '+c.drum);if(c.lk!==7)bad.push('lastKey '+c.lk);
+  if(c.dk!==4)bad.push('gatilho do DUCK '+c.dk);if(c.loop!=='5')bad.push('loop PERF '+c.loop);if(c.ref!=='12')bad.push('referência '+c.ref);if(c.again!=='2,12')bad.push('migrou duas vezes');
+  let g={};try{g=await (await fetch('testes/golden.json',{cache:'no-store'})).json()}catch(e){}
+  const ref=g[engine]&&g[engine].fp;let md=-1;
+  if(ref){E('S.patterns[1]=newPattern();S.loops=newLoops()');const f=fingerprint((await render({steps:32})).buf);md=0;if(f.length!==ref.length)md=999;else for(let i=0;i<f.length;i++)md=Math.max(md,Math.abs(f[i]-ref[i]));if(md>2)bad.push(`áudio mudou (${md}/1000)`)}
+  E('S=window.__keep');
+  rec(N,!bad.length,bad.length?bad.join(' · '):`notas de melodia viram semitons (índice 1,7 → 2,12), bateria igual, lastKey, DUCK e loops convertidos, migra uma vez só · áudio ${md<0?'sem referência':'igual à referência ('+md+'/1000)'}`)};
+T['11.2 acordes']=async()=>{const N='11.2 acordes',bad=[];
+  const nm=E(`[0,1,2,3,4,5,6].map(b=>kChord(b,null,0,0,0,0).name).join(' ')`);if(nm!=='C Dm Em F G Am Bdim')bad.push('C maior: '+nm);
+  const d7=E(`[0,1,2,3,4,5,6].map(b=>kChord(b,'UR',0,0,0,0).name).join(' ')`);if(d7!=='C7 D7 E7 F7 G7 A7 B7')bad.push('↗: '+d7);
+  const inv=E(`kChord(0,null,0,0,1,0).notes.join()`);if(inv!=='4,7,12')bad.push('1ª inversão '+inv);
+  const am=E(`[0,4].map(b=>kChord(b,null,9,1,0,-1).name+':'+kChord(b,null,9,1,0,-1).notes.join('/')).join(' ')`);if(am!=='Am:-3/0/4 Em:4/7/11')bad.push('A menor oit −1: '+am);
+  const nmx=E(`[chName([0,4,7,10]),chName([4,7,12]),chName([2,5,9,12]),chName([7]),chName([0,4,7,11,14])].join()`);if(nmx!=='C7,C,Dm7,G3,Cmaj9')bad.push('nomes '+nmx);
+  const b5=E(`(()=>{const p=newPattern();p.key=2;p.sc=0;return [0,1,2,3,4,5,6].map(b=>kChord(b,null,p.key,p.sc,0,0).name).join(' ')})()`);if(b5!=='D Em F#m G A Bm C#dim')bad.push('D maior: '+b5);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`C maior: ${nm} · ↗ = dominantes · inversão · tom e escala do padrão · nomes dos passos`)};
+T['11.3 gravar acorde ao vivo']=async()=>{const N='11.3 gravar acorde ao vivo',bad=[];
+  reset();const d=E('ensureCtx();S.bpm=120;S.swing=30;stepDur()');
+  E(`TST.fakeLat=0;DEV.latAdj=0;S.patterns[0]=newPattern();S.curPattern=0;const n=ctx.currentTime;sched=[];for(let i=0;i<8;i++)sched.push({time:n+(i-4)*${d}+(i%2?.3*${d}*.5:0),real:i,step:i,pat:0,g:i,dice:{}});
+    liveRecNs(0,kChord(4,'UR',0,0,0,0).notes)`);
+  const st=E(`Object.keys(S.patterns[0].tr[0].p).join()+'|'+S.patterns[0].tr[0].p[4].k.join()`);if(st!=='4|7,11,14,17')bad.push('gravou '+st);
+  // tocando o padrão, o acorde sai inteiro no passo 5 (4 ataques no mesmo instante)
+  const r=await render({steps:16,dry:true}),ev=r.ev.filter(e=>e.s===0),t5=r.t0+4*d;if(!(ev.length===4&&ev.every(e=>Math.abs(e.t-t5)<1e-6)))bad.push(`${ev.length} notas tocadas`);
+  E('TST.fakeLat=null;sched=[]');
+  rec(N,!bad.length,bad.length?bad.join(' · '):'G7 tocado no passo 5 grava [7,11,14,17] só no passo 5 e toca as 4 notas juntas, com swing 30%')};
+T['11.4 QUEBRA e RAMPA']=async()=>{const N='11.4 QUEBRA e RAMPA',bad=[];
+  reset();const d=E('stepDur()');E(`const p=newPattern();p.len=16;addNs(p,0,0,[0,4,7,11]);TL(p,0,0,{cm:{t:'q',n:4}});addNs(p,1,4,[0]);TL(p,1,4,{cm:{t:'ru',n:6}});addNs(p,2,8,[12]);TL(p,2,8,{cm:{t:'rd',n:4}});S.patterns[0]=p;`);
+  const r=await render({steps:16,dry:true}),f=s=>r.ev.filter(e=>e.s===s).map(e=>e.k+'@'+Math.round((e.t-r.t0)/d)).join(' ');
+  if(f(0)!=='0@0 4@1 7@2 11@3')bad.push('QUEBRA '+f(0));if(f(1)!=='0@4 2@5 4@6 5@7 7@8 9@9')bad.push('RAMPA↑ '+f(1));if(f(2)!=='12@8 11@9 9@10 7@11')bad.push('RAMPA↓ '+f(2));
+  rec(N,!bad.length,bad.length?bad.join(' · '):`QUEBRA 4 de Cmaj7 = ${f(0)} · RAMPA↑ 6 = ${f(1)} · RAMPA↓ 4 = ${f(2)}`)};
+T['11.5 GLIDE']=async()=>{const N='11.5 GLIDE',bad=[];
+  reset();E(`const p=newPattern();p.len=16;addK(p,0,0,0);addK(p,0,4,7);TL(p,0,4,{cm:{t:'gl'}});addK(p,0,8,5);S.patterns[0]=p;`);
+  const r=await render({steps:16,dry:true}),ev=r.ev.filter(e=>e.s===0);
+  if(!(ev.length===3&&ev[0].from===null&&ev[1].from===0&&ev[2].from===null))bad.push('origens '+ev.map(e=>e.from).join());
+  // no áudio, o meio do passo com glide está entre a nota anterior e a nova (frequência por cruzamentos de zero)
+  E(`window.__tn=(()=>{const r=44100,d=new Float32Array(r*2);for(let i=0;i<d.length;i++)d[i]=.5*Math.sin(2*Math.PI*220*i/r);return d})();samples[0]={data:window.__tn,rate:44100};invalidate(0);S.instr[0]=newSlot('seno')`);
+  const r2=await render({steps:8,dry:true}),b=r2.buf.getChannelData(0),sr=r2.buf.sampleRate,dd=E('stepDur()');
+  const hz=(a,z)=>{let n=0;for(let i=Math.round(a*sr)+1;i<Math.round(z*sr);i++)if(b[i-1]<0&&b[i]>=0)n++;return n/(z-a)};
+  const t4=r2.t0+4*dd,early=hz(t4+.004,t4+.03),late=hz(t4+.09,t4+.12);
+  if(!(early>225&&early<325&&late>320))bad.push(`frequência ${early.toFixed(0)} → ${late.toFixed(0)} Hz`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`passo com GLIDE parte da nota anterior: ${early.toFixed(0)} Hz logo depois do ataque → ${late.toFixed(0)} Hz (alvo 330 Hz)`)};
+T['11.6 SALTO']=async()=>{const N='11.6 SALTO',bad=[];
+  reset();E(`const p=newPattern();p.len=16;for(let i=0;i<16;i++)addK(p,0,i,i);TL(p,0,7,{cm:{t:'j',v:0}});addK(p,8,0,0);S.patterns[0]=p;`);
+  const r=await render({steps:32,dry:true}),d=E('stepDur()'),ks=r.ev.filter(e=>e.s===0).map(e=>e.k).join(','),kk=r.ev.filter(e=>e.s===8).map(e=>Math.round((e.t-r.t0)/d)).join(',');
+  const want='0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7';
+  if(ks!==want)bad.push('ordem '+ks);if(kk!=='0,16')bad.push('padrão saiu do tempo: bumbo em '+kk);
+  rec(N,!bad.length,bad.length?bad.join(' · '):'SALTO no passo 8 faz o som tocar 1–8 em loop; o padrão segue virando a cada 16 passos')};
+T['11.7 progressão']=async()=>{const N='11.7 progressão',bad=[];
+  reset();E(`const p=newPattern();p.len=16;[[0,[0,4,7]],[4,[5,9,12]],[8,[7,11,14]],[12,[0,4,7]]].forEach(([i,ns])=>addNs(p,0,i,ns));
+    [0,4,8,12].forEach(i=>{addK(p,1,i,0);addK(p,2,i,2)});TL(p,2,0,{cm:{t:'tn',v:'q'}});S.patterns[0]=p;S.prog=0;`);
+  const K=(r,s)=>r.ev.filter(e=>e.s===s).map(e=>e.k).join(',');
+  let r=await render({steps:16,dry:true});if(K(r,1)!=='0,5,-5,0')bad.push('segue: '+K(r,1));if(K(r,2).split(',')[0]!=='0')bad.push('QNT: '+K(r,2));
+  E(`S.instr[1].ton='ign'`);r=await render({steps:16,dry:true});if(K(r,1)!=='0,0,0,0')bad.push('ignora: '+K(r,1));
+  E(`S.instr[1].ton='seg';S.prog=-1`);r=await render({steps:16,dry:true});if(K(r,1)!=='0,0,0,0')bad.push('sem PROG mudou: '+K(r,1));
+  rec(N,!bad.length,bad.length?bad.join(' · '):'baixo em C com PROG C › F › G › C toca C, F, G (abaixo), C · ignora fica em C · QNT puxa D para C · sem PROG nada muda')};
+T['11.8 arp']=async()=>{const N='11.8 arp',bad=[];
+  reset();const seq=E(`S.arp={v:2,o:1,r:0,a:2};arpSeq([7,0,4]).join()`);if(seq!=='0,4,7,12,16,19')bad.push('↑ alcance 2: '+seq);
+  const ud=E(`S.arp.o=3;S.arp.a=1;arpSeq([0,4,7]).join()`);if(ud!=='0,4,7,4')bad.push('↑↓: '+ud);
+  const man=E(`S.arp.o=0;arpSeq([7,0,4]).join()`);if(man!=='7,0,4')bad.push('manual: '+man);
+  // no relógio: 1/16 = uma nota por passo; 1/16T = 3 a cada 2 passos; ritmo 3 pula notas
+  const run=v=>E(`(()=>{const keep=trigger,o=[];trigger=(s,k,t)=>o.push(k+'@'+(+(t/.125).toFixed(3)));S.arp={v:${v},o:1,r:0,a:2};arpK={s:0,seq:arpSeq([0,4,7]),b:0};
+    for(let g=0;g<8;g++)arpStep(g*.125,.125,g,g,null);arpK=null;trigger=keep;return o.join(' ')})()`);
+  const a16=run(2),a16t=run(3);
+  if(a16!=='0@0 4@1 7@2 12@3 16@4 19@5 0@6 4@7')bad.push('1/16: '+a16);
+  if(a16t.split(' ').length!==12||!a16t.startsWith('0@0 4@0.667 7@1.333 12@2'))bad.push('1/16T: '+a16t);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`↑ alcance 2 = ${seq} · ↑↓ e manual certos · 1/16 = uma por passo · 1/16T = 12 notas em 8 passos`)};
+T['11.9 superfície por tipo de som']=async()=>{const N='11.9 superfície por tipo de som',bad=[];
+  reset();const kb=(s,m,extra='')=>E(`S.curSound=${s};setMode('${m}');${extra}render();document.getElementById('app').dataset.kb`);
+  const a=kb(2,'play'),b=kb(11,'play'),c=kb(2,'steps','S.layView=false;'),d=kb(2,'perf'),e=kb(13,'steps'),f=kb(2,'steps','S.layView=true;');
+  if(a!=='full')bad.push('som 3 tocar: '+a);if(b!=='')bad.push('som 12 tocar: '+b);if(c!=='strip')bad.push('som 3 passos: '+c);if(d!=='perf')bad.push('som 3 perf: '+d);if(e!=='')bad.push('som 14 passos: '+e);if(f!=='')bad.push('camadas: '+f);
+  E(`S.layView=false;setMode('play')`);
+  // amostra importada num som de melodia: teclado afinado (G = +7 semitons sobre a amostra)
+  E(`samples[1]={data:window.__ck||new Float32Array(4410),rate:44100};invalidate(1);S.instr[1]=newSlot('importada');S.curSound=1;`);
+  const g=E(`kbEv(4).notes.join()`);if(g!=='7,11,14')bad.push('acorde na amostra '+g);
+  rec(N,!bad.length,bad.length?bad.join(' · '):'sons 1–8: teclado (inteiro em Tocar, só teclas em Perf, faixa em Passos) · sons 9–16: pads · amostra importada vira teclado')};
 
 /* testes registrados pelas fases seguintes */
 window.T=T;
