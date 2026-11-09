@@ -294,9 +294,12 @@ const PAGES=[{n:'TOM',k:['p','v'],l:['afin','vol']},{n:'FILTRO',k:['f','r'],l:['
 const MEM=40, R=32000, SL=0.2, TAU=Math.PI*2;
 const pad=n=>String(n).padStart(2,'0');
 const clamp01=v=>Math.max(0,Math.min(1,v));
+const TEST=/[?&]teste=1/.test(location.search);   // teste.html: banco separado, sem service worker
 
 /* ===================== ESTADO ===================== */
 let ctx=null, master=null, analyser=null, anBuf=null;
+const TST={tk:[]};                // medições do teste de jitter
+let RC=null;                      // render offline em andamento (testes): {ac,dest,voices,ev}
 let S=null;                       // estado salvo
 let samples=Array(16).fill(null); // {data:Float32Array, rate}
 const bufC=Array(16).fill(null), revC=Array(16).fill(null);
@@ -337,7 +340,8 @@ const defaultState=()=>migrate({v:1,vis:true,bpm:120,swing:0,vol:8,curPattern:0,
 const cf=f=>1-Math.exp(-TAU*Math.min(f,R*.45)/R);
 const LP=f=>{let y=0;const c=cf(f);return x=>(y+=c*(x-y))};
 const HP=f=>{const l=LP(f);return x=>x-l(x)};
-const N=()=>Math.random()*2-1;
+let seed=1;const rnd=()=>{seed=(seed+0x6D2B79F5)|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const N=()=>rnd()*2-1;   // ruído com semente: os sons de fábrica saem sempre iguais (base dos testes)
 const A=d=>new Float32Array(Math.round(d*R));
 function norm(a,p=.9){let m=0;for(let i=0;i<a.length;i++){const x=Math.abs(a[i]);if(x>m)m=x}if(m>1e-6)for(let i=0;i<a.length;i++)a[i]*=p/m;return a}
 function fades(a,inMs=1,outMs=10){const ni=Math.round(inMs*R/1000),no=Math.round(outMs*R/1000);for(let i=0;i<ni&&i<a.length;i++)a[i]*=i/ni;for(let i=0;i<no&&i<a.length;i++)a[a.length-1-i]*=i/no;return a}
@@ -370,7 +374,7 @@ const crush=(a,bits=4,hold=6)=>{const q=2**bits;let v=0;for(let i=0;i<a.length;i
 function kit(list){const n=Math.round(SL*R),o=new Float32Array(n*16);list.forEach((h,i)=>o.set(h.subarray(0,n),i*n));return o}
 
 function factorySamples(){
-  const s=Array(16).fill(null),w=d=>({data:d,rate:R});
+  seed=1;const s=Array(16).fill(null),w=d=>({data:d,rate:R});
   s[0]=w(mBass());s[1]=w(mLead());s[2]=w(mBell());s[3]=w(mVox());s[4]=w(mPluck());s[5]=w(mOrgan());
   s[8]=w(kit([kick(),kick(130,50,10,.4),snare(),snare(240,30,35,2500),clap(),hat(50),hat(9),hat(80,2.1),tom(95),tom(140),tom(200),rim(),cow(),crash(),shaker(),zap()]));
   s[9]=w(kit([kick(110,42,5,.05),kick(140,46,9,.1),snare(170,16,20,1000),clap(900),rim(),hat(60,1.3),hat(14,1.3),cow(),conga(200),conga(290),conga(380),clave(),shaker(22),tom(70,8),tom(105,8),blip(880,.08)]));
@@ -398,7 +402,7 @@ function factory(){
 
 /* ===================== ARMAZENAMENTO (IndexedDB, opcional) ===================== */
 const idb={db:null,
-  open(){if(this.db)return Promise.resolve(this.db);return new Promise((res,rej)=>{const r=indexedDB.open('bolso16',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{this.db=r.result;res(r.result)};r.onerror=()=>rej(r.error)})},
+  open(){if(this.db)return Promise.resolve(this.db);return new Promise((res,rej)=>{const r=indexedDB.open(TEST?'bolso16-teste':'bolso16',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{this.db=r.result;res(r.result)};r.onerror=()=>rej(r.error)})},
   async get(k){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('kv').objectStore('kv').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
   async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}};
 let saveT=null, samplesDirty=false;
@@ -440,20 +444,23 @@ async function importBackup(file){
 function ensureCtx(){
   if(!ctx){
     ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
-    const comp=ctx.createDynamicsCompressor();comp.threshold.value=-8;comp.ratio.value=4;comp.attack.value=.003;comp.release.value=.15;
-    master=ctx.createGain();master.connect(comp);comp.connect(ctx.destination);setVol();
-    try{analyser=ctx.createAnalyser();analyser.fftSize=512;comp.connect(analyser);anBuf=new Float32Array(analyser.fftSize)}catch(e){}
+    const m=buildMaster(ctx);master=m.inp;setVol();
+    try{analyser=ctx.createAnalyser();analyser.fftSize=512;m.out.connect(analyser);anBuf=new Float32Array(analyser.fftSize)}catch(e){}
   }
   if(ctx.state!=='running')ctx.resume().catch(()=>{});
 }
+/* cadeia do master, igual ao vivo e no render offline dos testes */
+function buildMaster(C){const comp=C.createDynamicsCompressor();comp.threshold.value=-8;comp.ratio.value=4;comp.attack.value=.003;comp.release.value=.15;
+  const inp=C.createGain();inp.gain.value=(S.vol/10)*.8;inp.connect(comp);comp.connect(C.destination);return {inp,out:comp}}
 function setVol(){if(master)master.gain.value=(S.vol/10)*.8}
-function mkBuf(d,rate){const b=ctx.createBuffer(1,d.length,rate);b.getChannelData(0).set(d);return b}
-function getBuf(i,rev){const s=samples[i];if(!s||!ctx)return null;if(!bufC[i])bufC[i]=mkBuf(s.data,s.rate);if(!rev)return bufC[i];if(!revC[i])revC[i]=mkBuf(s.data.slice().reverse(),s.rate);return revC[i]}
+function mkBuf(d,rate,C=ctx){const b=C.createBuffer(1,d.length,rate);b.getChannelData(0).set(d);return b}
+function getBuf(i,rev,C=ctx){const s=samples[i];if(!s||!C)return null;if(!bufC[i])bufC[i]=mkBuf(s.data,s.rate,C);if(!rev)return bufC[i];if(!revC[i])revC[i]=mkBuf(s.data.slice().reverse(),s.rate,C);return revC[i]}
 function invalidate(i){bufC[i]=null;revC[i]=null}
 
 function trigger(slot,key,t,o={}){
-  const fx=o.fx??-1, rev=fx===14, C=o.ac||ctx, OUT=o.dest||master, offl=!!o.ac;
-  const b=getBuf(slot,rev);if(!b)return;
+  const fx=o.fx??-1, rev=fx===14, C=o.ac||(RC&&RC.ac)||ctx, OUT=o.dest||(RC&&RC.dest)||master, offl=!!o.ac, VO=RC?RC.voices:voices;
+  const b=getBuf(slot,rev,C);if(!b)return;
+  if(RC&&RC.ev)RC.ev.push({s:slot,k:key,t,fx,gain:o.gain??1,lock:o.lock||null});
   const sl=S.slots[slot],P=o.lock?{...sl.params,...o.lock}:sl.params;
   const drum=slot>=8,D=b.duration;
   let off,len,semi;
@@ -464,7 +471,7 @@ function trigger(slot,key,t,o={}){
   let rate=Math.pow(2,semi/12);if(fx===6)rate*=2;if(fx===7)rate*=.5;
   let dur=len/rate;if(o.maxDur)dur=Math.min(dur,o.maxDur);
   const vol=P.v*P.v*1.4*(o.gain??1);
-  if(!drum&&!offl){for(const vc of voices[slot])if(vc.t<t-.002&&vc.end>t){try{vc.g.gain.cancelScheduledValues(t);vc.g.gain.setValueAtTime(vc.vol,t);vc.g.gain.linearRampToValueAtTime(0,t+.012);vc.srcs.forEach(s=>{try{s.stop(t+.015)}catch(e){}})}catch(e){}vc.end=t}}
+  if(!drum&&!offl){for(const vc of VO[slot])if(vc.t<t-.002&&vc.end>t){try{vc.g.gain.cancelScheduledValues(t);vc.g.gain.setValueAtTime(vc.vol,t);vc.g.gain.linearRampToValueAtTime(0,t+.012);vc.srcs.forEach(s=>{try{s.stop(t+.015)}catch(e){}})}catch(e){}vc.end=t}}
   const flt=C.createBiquadFilter();
   if(P.f<.47){flt.type='lowpass';flt.frequency.value=80*Math.pow(2,(P.f/.47)*8)}
   else if(P.f>.53){flt.type='highpass';flt.frequency.value=20*Math.pow(2,((P.f-.53)/.47)*9.5)}
@@ -481,6 +488,7 @@ function trigger(slot,key,t,o={}){
   if(fx===4){mk(rate,-14);mk(rate,14)}
   if(fx===5)mk(rate/2);
   if(offl)return;
+  if(RC){RC.voices[slot].push(vc);return}
   first.onended=()=>{const L=voices[slot],i=L.indexOf(vc);if(i>=0)L.splice(i,1);setTimeout(()=>{try{g.disconnect();flt.disconnect()}catch(e){}},100)};
   voices[slot].push(vc);
   if(S.vis&&vEv.length<256)vEv.push({t,k:key,s:slot,v:Math.min(1,vol)});
@@ -491,7 +499,7 @@ function playNow(slot,key){ensureCtx();trigger(slot,key,ctx.currentTime+.005,{fx
 /* ===================== SEQUENCIADOR ===================== */
 const stepDur=()=>60/S.bpm/4;
 /* metrônomo: sai direto no destino, fora do master e dos efeitos */
-function click(t,acc){if(!ctx)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type='square';o.frequency.value=acc?1760:1175;
+function click(t,acc){if(!ctx||RC)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type='square';o.frequency.value=acc?1760:1175;
   const v=(S.metVol/10)*.2;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.001);g.gain.exponentialRampToValueAtTime(.0001,t+.035);
   o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.05);o.onended=()=>{try{g.disconnect()}catch(e){}}}
 const perfLive=()=>S.perf.tracks.some(t=>t.st==='rec'||t.st==='ovd')||perfPend.some(p=>p.a==='rec'||p.a==='ovd');
@@ -510,6 +518,7 @@ function stopPlay(){finishPass();playing=false;clearTimeout(tm);sched=[];visCur=
 function tick(){if(!playing)return;const dur=stepDur();
   while(nextTime<ctx.currentTime+.12){
     if(countLeft>0){const i=16-countLeft;if(i%4===0)click(nextTime,i===0);nextTime+=dur;countLeft--;continue}
+    if(TEST)TST.tk.push([nextTime,ctx.currentTime,gStep]);
     scheduleStep();advance()}
   tm=setTimeout(tick,20)}
 function scheduleStep(){
@@ -536,6 +545,23 @@ function advance(){nextTime+=stepDur();stepIdx++;gStep++;
   if(stepIdx>=S.patterns[playPat].len){stepIdx=0;
     if(pendingChain){S.chain=pendingChain;pendingChain=null;chainPos=0}else chainPos=(chainPos+1)%S.chain.length;
     playPat=S.chain[chainPos];S.curPattern=playPat}}
+/* render offline: roda o mesmo agendador num OfflineAudioContext, sem tocar no estado ao vivo */
+async function renderOffline({steps=32,rate=44100,dry=false,pat=null,tail=1.5}={}){
+  const OC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const t0=.05,len=t0+steps*stepDur()+tail,oc=new OC(1,Math.ceil(len*rate),rate);
+  const out=dry?oc.destination:buildMaster(oc).inp;
+  const keep={playing,nextTime,stepIdx,chainPos,playPat,gStep,sched,loopSt,retr,countLeft,liveRecOn,pendingChain,cur:S.curPattern};
+  RC={ac:oc,dest:out,voices:Array.from({length:16},()=>[]),ev:[],steps:[]};
+  try{if(pat!=null){S.curPattern=pat;}
+    stepIdx=0;gStep=0;chainPos=Math.max(0,S.chain.indexOf(S.curPattern));playPat=S.chain.includes(S.curPattern)?S.chain[chainPos]:S.curPattern;
+    if(!S.chain.includes(S.curPattern))chainPos=0;
+    nextTime=t0;sched=[];loopSt=null;retr=null;countLeft=0;liveRecOn=false;pendingChain=null;
+    for(let i=0;i<steps;i++){scheduleStep();RC.steps.push(sched[sched.length-1]);advance()}}
+  finally{const ev=RC.ev,st=RC.steps;RC=null;
+    ({playing,nextTime,stepIdx,chainPos,playPat,gStep,sched,loopSt,retr,countLeft,liveRecOn,pendingChain}=keep);S.curPattern=keep.cur;
+    var res={ev,steps:st,t0}}
+  res.buf=await new Promise((ok,no)=>{oc.oncomplete=e=>ok(e.renderedBuffer);const p=oc.startRendering();if(p&&p.then)p.then(ok,no)});
+  return res}
 /* repetição de nota: o pad segurado repete na grade escolhida */
 function reptStep(pat,real,t,dur,g){const cs=S.curSound,div=S.rept;
   for(let k=0;k<16;k++){if(!pressed[k])continue;
@@ -1133,15 +1159,16 @@ function frame(){requestAnimationFrame(frame);if(!S)return;micTick();
 /* ===================== INÍCIO ===================== */
 (async function init(){
   buildUI();
-  try{if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
+  try{if(!TEST&&'serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   let ok=false;
-  try{const st=await idb.get('state'),sm=await idb.get('samples');if(st&&st.v===1&&Array.isArray(sm)&&st.patterns&&st.patterns.length===16){S=migrate(st);samples=sm;ok=true}}catch(e){}
+  if(!TEST)try{const st=await idb.get('state'),sm=await idb.get('samples');if(st&&st.v===1&&Array.isArray(sm)&&st.patterns&&st.patterns.length===16){S=migrate(st);samples=sm;ok=true}}catch(e){}
   if(!ok)factory();
   if(S.vis===undefined)S.vis=true;
   setVis(S.vis);
   flash('● REC PARA GRAVAR · ⋯ = MENU E AJUDA',3500);
   requestAnimationFrame(frame);
+  if(TEST)window.APP_READY=true;
 })();
 
 </script>

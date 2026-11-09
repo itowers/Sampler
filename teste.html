@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bolso-16 · testes</title>
+<style>
+body{font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;margin:16px;background:#f4f3ef;color:#111}
+h1{font-size:15px;margin:0 0 6px}
+p{margin:4px 0 10px;color:#555}
+button{font:inherit;padding:10px 16px;border-radius:10px;border:1px solid #0003;background:#fff;box-shadow:0 2px 0 #c9c8c2;cursor:pointer}
+pre{white-space:pre-wrap;background:#fff;border:1px solid #0002;border-radius:10px;padding:10px;min-height:120px}
+.ok{color:#127a2a}.no{color:#d93a0b;font-weight:700}.av{color:#a06a00}
+iframe{width:390px;height:720px;border:1px solid #0003;border-radius:12px;background:#fff;margin-top:10px}
+</style>
+</head>
+<body>
+<h1>Bolso-16 · testes</h1>
+<p>Roda o app num quadro separado, com banco de dados próprio (não mexe nos seus sons e padrões). <b>?rapido=1</b>: jitter em 5 s em vez de 30 s · <b>?atualizar=1</b>: gera a referência de áudio nova para salvar em <code>testes/golden.json</code> · <b>?auto=1</b>: roda sozinho ao abrir.</p>
+<button id="go">Rodar testes</button>
+<pre id="out">Toque em "Rodar testes". O teste de jitter toca som de verdade por alguns segundos.</pre>
+<iframe id="app" src="index.html?teste=1" title="app em modo de teste"></iframe>
+<script>
+'use strict';
+const Q=new URLSearchParams(location.search),FAST=Q.has('rapido'),UPD=Q.has('atualizar');
+const out=document.getElementById('out');
+let A=null;                                   // window do app
+const E=code=>A.eval(code);                   // acessa o escopo global do app (let/const incluídos)
+const RESULTS=[];window.RESULTS=RESULTS;window.DONE=false;
+const engine=/Firefox\//.test(navigator.userAgent)?'firefox':/Chrome\//.test(navigator.userAgent)?'chromium':'webkit';
+function log(t,c){const s=document.createElement('span');if(c)s.className=c;s.textContent=t+'\n';out.appendChild(s);console.log(t)}
+function rec(n,ok,msg,warn){RESULTS.push({n,ok,msg,warn:!!warn});log(`${warn?'AVISO':ok?'OK   ':'FALHA'} ${n} · ${msg}`,warn?'av':ok?'ok':'no')}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const ms=x=>(x*1000).toFixed(2)+' ms';
+
+/* ---------- utilidades ---------- */
+async function sha(buf){const d=buf.getChannelData(0),q=new Int16Array(d.length);
+  for(let i=0;i<d.length;i++){const x=Math.max(-1,Math.min(1,d[i]));q[i]=Math.round(x*32767)}
+  const h=await crypto.subtle.digest('SHA-256',q.buffer);return[...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+/* ataques: primeira amostra acima do limiar depois de pelo menos `gap` segundos de silêncio */
+function onsets(buf,thr=.02,gap=.04){const d=buf.getChannelData(0),r=buf.sampleRate,G=Math.round(gap*r),o=[];let lastLoud=-G;
+  for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>thr){if(i-lastLoud>=G)o.push(i/r);lastLoud=i}}return o}
+/* som de clique: 16 fatias de 0,2 s, cada uma com um tom de 30 ms no início */
+function clickKit(rate=44100){const n=Math.round(.2*rate),d=new Float32Array(n*16);
+  for(let s=0;s<16;s++)for(let i=0;i<Math.round(.03*rate);i++)d[s*n+i]=(i%40<20?.8:-.8);return d}
+function reset(){E(`factory();heldFx=-1;fxRec=false;page=0;S.swing=0;S.bpm=120;S.chain=[0];S.curPattern=0;pendingChain=null;undoSt=[];perfPend=[];S.perf=newPerf();`)}
+function useClicks(slot=8){A.__ck=clickKit();E(`samples[${slot}]={data:window.__ck,rate:44100};invalidate(${slot});S.slots[${slot}]=newSlot('clique')`)}
+function goldenSetup(){reset();E(`S.bpm=120;S.swing=30;S.vol=8;
+  const p=newPattern();p.len=16;const k=(s,st,key)=>p.n[s][st].push(key);
+  [0,4,8,12].forEach(i=>k(8,i,0));[4,12].forEach(i=>k(8,i,2));for(let i=0;i<16;i+=2)k(8,i,5);k(8,7,5);k(8,15,7);
+  [0,3,6,8,10,11,14].forEach((i,j)=>k(0,i,[0,0,7,4,3,4,2][j]));p.lk[0][8]={f:.25,r:.4};
+  S.patterns[0]=p;S.chain=[0];S.curPattern=0;`)}
+/* impressão digital: RMS em blocos de 5 ms ×1000, arredondado. O render offline do Chrome varia ~1e-6 entre execuções,
+   então um SHA exato do áudio não é estável; a impressão compara com tolerância de 2/1000. */
+function fingerprint(buf){const d=buf.getChannelData(0),B=Math.round(buf.sampleRate*.005),f=[];
+  for(let i=0;i<d.length;i+=B){let s=0,n=0;for(let j=i;j<i+B&&j<d.length;j++){s+=d[j]*d[j];n++}f.push(Math.round(Math.sqrt(s/n)*1000))}return f}
+function offerDownload(g,f){const o=Object.assign({},g,{[engine]:{fp:f,date:new Date().toISOString()}});const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download='golden.json';a.textContent='Baixar referência (golden.json)';a.style.display='block';out.after(a)}
+const render=o=>E(`renderOffline(${JSON.stringify(o||{})})`);
+
+/* ---------- testes ---------- */
+const T={};
+T['9.1 impressão digital do áudio']=async()=>{const N='9.1 impressão digital do áudio';
+  goldenSetup();const r=await render({steps:32});const f=fingerprint(r.buf),h=await sha(r.buf);
+  let g={};try{g=await (await fetch('testes/golden.json',{cache:'no-store'})).json()}catch(e){}
+  if(UPD){window.NEWGOLD={engine,fp:f};log(`impressão nova (${engine}): ${f.length} blocos · use "Baixar referência" e salve em testes/golden.json`,'av');offerDownload(g,f)}
+  const ref=g[engine]&&g[engine].fp;
+  if(!ref)return rec(N,true,`sem referência para ${engine} (rode com ?atualizar=1 e salve)`,true);
+  if(ref.length!==f.length)return rec(N,false,`duração mudou: ${f.length} blocos ≠ ${ref.length}`);
+  let md=0,at=0;for(let i=0;i<f.length;i++){const d=Math.abs(f[i]-ref[i]);if(d>md){md=d;at=i}}
+  rec(N,md<=2,md<=2?`igual à referência (desvio máx ${md}/1000 RMS · sha ${h.slice(0,10)}…)`:`mudou: desvio ${md}/1000 RMS em ${(at*5)} ms`)};
+
+T['9.2 timing do sequenciador']=async()=>{
+  reset();useClicks();E(`S.swing=30;const p=newPattern();p.len=16;for(let i=0;i<16;i++)p.n[8][i].push(i%4);S.patterns[0]=p;`);
+  const r=await render({steps:16,dry:true}),dur=E('stepDur()'),sw=.3;
+  const exp=[...Array(16)].map((_,i)=>r.t0+i*dur+(i%2?sw*dur*.5:0)),got=onsets(r.buf);
+  if(got.length!==16)return rec('9.2 timing do sequenciador',false,`${got.length} ataques, esperava 16`);
+  const err=Math.max(...got.map((t,i)=>Math.abs(t-exp[i])));
+  rec('9.2 timing do sequenciador',err<=.001,`erro máximo ${ms(err)} (limite 1 ms) · swing 30%`)};
+
+T['9.4 jitter do relógio']=async()=>{
+  reset();E(`ensureCtx();S.patterns[0]=demoPattern();S.chain=[0];S.curPattern=0;S.met=0;TST.tk=[];`);
+  for(let i=0;i<50&&E('ctx.state')!=='running';i++)await sleep(100);
+  if(E('ctx.state')!=='running')return rec('9.4 jitter do relógio',false,'o áudio não começou (toque na página e rode de novo)');
+  const secs=FAST?5:30;E('startPlay(false)');await sleep(secs*1000);E('stopPlay()');
+  const tk=E('TST.tk.slice()'),dur=E('stepDur()');if(tk.length<10)return rec('9.4 jitter do relógio',false,'poucos passos agendados');
+  const [t0,,g0]=tk[0];let maxErr=0,minLead=1,late=0;
+  for(const [t,now,g] of tk){maxErr=Math.max(maxErr,Math.abs(t-(t0+(g-g0)*dur)));const lead=t-now;minLead=Math.min(minLead,lead);if(lead<.010)late++}
+  window.JITTER={maxErr,minLead,late,n:tk.length};
+  rec('9.4 jitter do relógio',maxErr<.0005&&late===0,`${secs}s · ${tk.length} passos · desvio máx ${ms(maxErr)} · menor antecedência ${ms(minLead)} · ${late} passos com < 10 ms`)};
+
+T['9.10 orçamento de CPU']=async()=>{
+  reset();E(`for(const i of [6,7]){samples[i]=samples[i-6];S.slots[i].name='cópia'}for(const i of [12,13,14,15]){samples[i]=samples[i-4];S.slots[i].slices=defSlices()}
+    for(let i=0;i<16;i++)invalidate(i);
+    const p=newPattern();p.len=64;for(let s=0;s<16;s++)for(let st=0;st<64;st++)if((st+s)%2===0)p.n[s][st].push((st+s)%8);
+    for(let st=0;st<64;st++)p.fx[st]=[-1,8,4,9,6,-1,10,14][st%8];
+    if(typeof p.lk[0][0]!=='undefined')for(let st=0;st<64;st+=4)p.lk[3][st]={rat:3};
+    S.patterns[0]=p;S.chain=[0];S.curPattern=0;`);
+  const t=performance.now(),r=await render({steps:128}),wall=(performance.now()-t)/1000,dur=r.buf.duration,pc=wall/dur*100;
+  window.CPU={wall,dur,pc};
+  rec('9.10 orçamento de CPU',pc<25,`8 compassos com 16 sons e FX: render ${wall.toFixed(2)}s para ${dur.toFixed(1)}s de áudio = ${pc.toFixed(1)}% (limite 25%)`)};
+
+/* testes registrados pelas fases seguintes */
+window.T=T;
+
+async function run(){
+  out.textContent='';RESULTS.length=0;window.DONE=false;
+  A=document.getElementById('app').contentWindow;
+  for(let i=0;i<100&&!(A&&A.APP_READY);i++){await sleep(100);A=document.getElementById('app').contentWindow}
+  if(!A||!A.APP_READY){log('o app não abriu','no');window.DONE=true;return}
+  log(`motor: ${engine} · ${new Date().toLocaleString('pt-BR')}`);
+  const only=Q.get('so');
+  for(const [n,f] of Object.entries(T)){if(only&&!n.startsWith(only))continue;
+    try{await f()}catch(e){rec(n,false,'erro: '+(e&&e.stack||e).toString().split('\n').slice(0,2).join(' · '))}}
+  const no=RESULTS.filter(r=>!r.ok).length,av=RESULTS.filter(r=>r.warn).length;
+  log(`\nRESUMO: ${RESULTS.length-no-av} OK · ${no} FALHA · ${av} AVISO`,no?'no':'ok');
+  console.log('RESUMO',JSON.stringify(RESULTS));window.DONE=true}
+document.getElementById('go').onclick=run;
+if(Q.has('auto'))addEventListener('load',()=>setTimeout(run,300));
+</script>
+</body>
+</html>
