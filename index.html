@@ -260,27 +260,33 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <tr><td>borracha</td><td>com REC ligado, segure um pad: apaga aquela nota nos passos que passarem</td></tr>
  <tr><td>desfazer</td><td>volta a última volta gravada (até 8)</td></tr>
  <tr><td>Passos</td><td>pads = 16 passos da página atual. Toque para pôr/tirar a nota escolhida em − nota +. A faixa do visor também edita. comp = 8 · 16 · 32 · 64 passos (esticar duplica; encurtar não apaga). Com mais de 16, toque nos blocos acima da faixa para trocar de página; seguir = a página acompanha o playhead</td></tr>
- <tr><td>ver: todos</td><td>em Passos, mostra todos os sons do padrão sobrepostos: uma linha por som, toque na célula para pôr/tirar nota. M = mute, S = solo. + mostrar os 16 sons</td></tr>
- <tr><td>Perf</td><td>looper de 4 faixas de notas. O botão grande da faixa cicla REC → OVD (overdub) → PLAY → OVD. Toda ação entra no próximo compasso (Q muda para tempo ou livre). O primeiro loop arredonda para 1, 2, 4 ou 8 compassos. MUTE por faixa. desf por volta (refaz aparece depois de desfazer), comp 1·2·4·8 compassos (esticar duplica), limpar. FB: no overdub, as notas antigas perdem volume a cada volta. salvar = faixas viram um padrão livre. reamost. = grava as faixas em áudio num som livre (1–8)</td></tr>
+ <tr><td>passo</td><td>em Passos: toque um passo para editar (passo vazio ganha a nota; tocar de novo no selecionado apaga). rat = ratchet, repete 2–4× dentro do passo · mic − + = micro timing, adianta ou atrasa até meio passo · condição: sempre, 1:2 (voltas 1, 3, 5…), 2:2, 1:4, 50%, FILL (só com FILL ligado), !FILL · tie = sons 1–8 não redisparam e a nota anterior continua. A faixa do visor marca: laranja = ratchet, bolinha cinza = condição, traço = micro ou tie</td></tr>
+ <tr><td>FILL</td><td>toque = liga/desliga · segure = vale só enquanto pressionado. Toca os passos com condição FILL e cala os !FILL</td></tr>
+ <tr><td>todos</td><td>em Passos, mostra todos os sons do padrão sobrepostos: uma linha por som, toque na célula para pôr/tirar nota. M = mute, S = solo. + mostrar os 16 sons. Toque no nome do som atual para mudar o comprimento (comp − +) e a divisão (‹ 1/16 ›) só dele: sons com comprimentos diferentes rodam juntos (polimetria), sempre contados do início do padrão</td></tr>
+ <tr><td>Perf</td><td>bpm loop (com tudo vazio e parado): toque a faixa, toque as notas e toque a faixa de novo; esse tempo vira o loop (1–8 compassos) e define o BPM. Depois volta a ser bpm fixo. Looper de 4 faixas de notas. O botão grande da faixa cicla REC → OVD (overdub) → PLAY → OVD. Toda ação entra no próximo compasso (Q muda para tempo ou livre). O primeiro loop arredonda para 1, 2, 4 ou 8 compassos. MUTE por faixa. desf por volta (refaz aparece depois de desfazer), comp 1·2·4·8 compassos (esticar duplica), limpar. FB: no overdub, as notas antigas perdem volume a cada volta. salvar = faixas viram um padrão livre. reamost. = grava as faixas em áudio num som livre (1–8)</td></tr>
  <tr><td>MET</td><td>metrônomo: desligado → só gravando (traço laranja) → sempre (preto). Contagem e volume no menu ⋯</td></tr>
- <tr><td>Som</td><td>escolhe um dos 16 sons · copiar para · carregar áudio · gravar mic · apagar</td></tr>
+ <tr><td>Som</td><td>escolhe um dos 16 sons · copiar · carregar áudio · mic · chop · textura · apagar</td></tr>
+ <tr><td>chop</td><td>fatia a amostra do som atual. ▶ tap toca a amostra: toque tap (ou qualquer pad) em cada fatia. ataques = acha as batidas (sens no slider) · grade = partes iguais (4, 8 ou 16 no slider). No visor: arraste uma marca para mover, toque no vazio para criar, dois toques para apagar. Os pads tocam cada fatia. distribuir = as fatias viram os pads de um som de bateria (o atual ou o primeiro livre de 9–16)</td></tr>
+ <tr><td>textura</td><td>toca um som em loop, fora da grade, como base. Os pads escolhem o som · ▶ tocar / ■ parar · freeze congela num grão curto · sliders: volume e filtro. Pulsa junto com o DUCK</td></tr>
  <tr><td>Padrão</td><td>escolhe um dos 16 padrões · copiar para · montar cadeia (toque padrões em ordem, até 128) · comp · limpar</td></tr>
- <tr><td>FX</td><td>16 efeitos. Segurar = enquanto o pad está pressionado · Travar = liga/desliga · Gravar no padrão = salva o efeito nos passos</td></tr>
+ <tr><td>FX</td><td>16 efeitos. Segurar = enquanto o pad está pressionado · Travar = liga/desliga · gravar = salva o efeito nos passos. Os sliders viram o mix: DUCK (quanto abaixa os outros sons quando o gatilho toca · soltura), FILT (filtro DJ: esquerda passa-baixa, direita passa-alta · fade dos efeitos), DUST (lo-fi · ruído de vinil). Com o cadeado, o DJ grava por passo</td></tr>
  <tr><td>gravar mic</td><td>no modo Som: ao ligar, o navegador pede o microfone. Com o mic pronto, segure um pad enquanto faz o som e solte para terminar. Se o mic estiver bloqueado (por exemplo dentro do claude.ai), o pad abre o seletor de arquivo de áudio</td></tr>
- <tr><td>⋯</td><td>menu: volume geral, visual, tela cheia, metrônomo, ajuda e backup</td></tr>
+ <tr><td>⋯</td><td>menu: volume geral, visual, tela cheia, metrônomo, calibrar latência, gatilho do DUCK, fade dos efeitos, ajuda e backup</td></tr>
+ <tr><td>calibrar</td><td>no menu: toque um pad junto com 8 cliques. O app mede seu atraso e grava o REC ao vivo no passo certo</td></tr>
  </table>
  <h3>Parâmetros</h3>
  <table>
  <tr><td>TOM</td><td>afinação · volume</td></tr>
- <tr><td>FILTRO</td><td>filtro (esquerda LP, direita HP) · ressonância</td></tr>
- <tr><td>CORTE</td><td>início · duração (em bateria, da última fatia tocada)</td></tr>
+ <tr><td>FILT</td><td>filtro (esquerda LP, direita HP) · ressonância</td></tr>
+ <tr><td>CORT</td><td>início · duração (em bateria, da última fatia tocada)</td></tr>
+ <tr><td>INS</td><td>efeito do som: nada · drive · crush · filtro · quantidade</td></tr>
  <tr><td>🔒</td><td>com o cadeado ligado e tocando, os sliders gravam travas nos passos que passam</td></tr>
  </table>
  <h3>Efeitos</h3>
  <p class="note">1 loop 16 · 2 loop 12 · 3 loop curto · 4 loop + curto · 5 uníssono · 6 uníssono grave · 7 oitava ↑ · 8 oitava ↓ · 9 stutter 4 · 10 stutter 3 · 11 scratch · 12 scratch rápido · 13 quantização 6/8 · 14 retrigger · 15 reverso · 16 sem efeito</p>
  <h3>Visual</h3>
  <p class="note">Ferrofluido no visor: cada pad é um ímã na posição dele, sons melódicos levantam um anel, BPM pulsa no play. Filtro arredonda/afia os espinhos, ressonância muda a densidade. ⛶ abre em tela cheia.</p>
- <p class="note">Memória total de 40 s. No iPhone, desligue o modo silencioso. Padrões e sons ficam salvos só neste navegador.</p>
+ <p class="note">O master tem um limitador: quando ele aperta mais de 3 dB, o visor mostra LIM. Memória total de 40 s. No iPhone, desligue o modo silencioso. Padrões e sons ficam salvos só neste navegador.</p>
 </div></div>
 
 <div id="menu" class="ov hidden"><div class="card">
