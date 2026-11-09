@@ -25,7 +25,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 /* teclas (skeumorfismo): face clara, borda e base pretas; ligada = afundada e preta */
 .tile,.modes button,.ctx button,.seg button,.trans button,.lock,.mbtn,.card .x,.lname,.lm,.ls,.pbig,.pmute,.phd button{background:var(--key);border:1px solid var(--edge);box-shadow:var(--keysh);transition:transform .04s}
 .modes button:active,.ctx button:active,.seg button:active,.trans button:active,.lock:active,.mbtn:active,.tile.big:active,.lname:active,.lm:active,.ls:active,.pbig:active,.pmute:active,.phd button:active{transform:translateY(2px);box-shadow:0 0 0 var(--base),inset 0 1px 3px #0002}
-.modes button.on,.ctx button.on,.seg button.on,.lock.on,.trans .tg.on,.trans .fill.on,.trans .play.on,.lm.on,.ls.on,.pmute.on{background:var(--keyon);color:#fff;box-shadow:var(--keyonsh);transform:translateY(1px)}
+.modes button.on,.ctx button.on,.seg button.on,.lock.on,.trans .tg.on,.trans .fill.on,.phd button.on,.trans .play.on,.lm.on,.ls.on,.pmute.on{background:var(--keyon);color:#fff;box-shadow:var(--keyonsh);transform:translateY(1px)}
 /* visor: afundado no corpo */
 #disp{position:relative;background:var(--panel);border:1.5px solid var(--ink);border-radius:clamp(14px,2.4dvh,24px);flex:0 0 clamp(118px,23dvh,280px);overflow:hidden;padding:clamp(10px,1.6dvh,16px) clamp(12px,2vw,18px) clamp(10px,1.4dvh,14px);display:flex;flex-direction:column;box-shadow:0 1px 0 #fff}
 #disp::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 3px 10px #00000040,inset 0 0 0 3px #f6f5f1b0;pointer-events:none;z-index:3}
@@ -352,11 +352,11 @@ function migrate(s){
     if(!Array.isArray(p.sc)||p.sc.length!==16)p.sc=newSc();if(!Array.isArray(p.mx))p.mx=Array(64).fill(null);while(p.mx.length<64)p.mx.push(null);p.sc.forEach(x=>{if(!(x.c>=0&&x.c<=64))x.c=0;if(!(x.d>=0&&x.d<7))x.d=1})}
   if(s.met===undefined)s.met=1;if(s.metVol===undefined)s.metVol=6;if(s.countIn===undefined)s.countIn=true;
   if(!(s.rept>=0&&s.rept<4))s.rept=0;if(s.page===undefined)s.page=0;if(s.follow===undefined)s.follow=true;
-  if(s.layAll===undefined)s.layAll=false;if(!(Math.abs(s.latAdj)<=80))s.latAdj=0;if(!(s.chopSens>=0&&s.chopSens<=1))s.chopSens=.5;if(![4,8,16].includes(s.chopGrid))s.chopGrid=16;if(!s.mix)s.mix=MIXDEF();{const d=MIXDEF();for(const k in d)if(s.mix[k]===undefined)s.mix[k]=d[k]}
+  if(s.layAll===undefined)s.layAll=false;if(!(Math.abs(s.latAdj)<=80))s.latAdj=0;if(!(s.chopSens>=0&&s.chopSens<=1))s.chopSens=.5;if(!s.tex)s.tex={s:-1,vol:.6,f:1,frz:false};s.tex.frz=false;if(![4,8,16].includes(s.chopGrid))s.chopGrid=16;if(!s.mix)s.mix=MIXDEF();{const d=MIXDEF();for(const k in d)if(s.mix[k]===undefined)s.mix[k]=d[k]}
   for(const sl of s.slots||[])if(!sl.ins)sl.ins={t:0,a:.5};s.layFull=false;if(s.layView===undefined)s.layView=false;
   if(!s.noDemo){s.noDemo=true;const d=demoPattern(),p=s.patterns[0];
     if(p&&JSON.stringify(p.n.map(r=>r.slice(0,16)))===JSON.stringify(d.n.map(r=>r.slice(0,16)))&&!p.n.some(r=>r.slice(16).some(x=>x.length))){const L=p.len;s.patterns[0]=newPattern();s.patterns[0].len=L}}
-  if(!s.perf||!Array.isArray(s.perf.tracks)||s.perf.tracks.length!==4)s.perf=newPerf();
+  if(!s.perf||!Array.isArray(s.perf.tracks)||s.perf.tracks.length!==4)s.perf=newPerf();if(s.perf.free===undefined)s.perf.free=false;
   s.perf.tracks.forEach((t,i)=>{const d=newTrack();for(const k in d)if(t[k]===undefined)t[k]=d[k];if(t.st==='rec')s.perf.tracks[i]=Object.assign(newTrack(),{fb:t.fb});else if(t.st==='ovd')t.st='play';t.pass=null;t.touched=false});
   return s}
 const defSlices=()=>Array.from({length:16},(_,i)=>({st:i/16,ln:1/16}));
@@ -732,7 +732,20 @@ function perfAdd(s,k,g){const t=recTrack();if(!t)return;let pos;
   if(t.st==='rec'){pos=g-t.t0;if(pos<0){if(pos>=-1)pos=0;else return}if(pos>=128)return}
   else{const L=t.len*16;pos=((g-t.t0)%L+L)%L}
   const a=t.ev[pos]||(t.ev[pos]=[]);if(a.some(e=>e[0]===s&&e[1]===k))return;a.push([s,k,1,1]);t.touched=true;dirty()}
+/* PERF › BPM loop: com tudo vazio e parado, o tempo entre dois toques na faixa define o loop e o BPM */
+let freeCap=null;
+const perfEmpty=()=>S.perf.tracks.every(t=>t.st==='empty'&&!t.len);
+function freeBars(D){let best=null;for(const n of P2){const b=60*n*4/D;if(b>=70&&b<=180&&(!best||Math.abs(b-120)<Math.abs(best.b-120)))best={n,b}}
+  if(!best){const n=P2.reduce((a,x)=>Math.abs(60*x*4/D-120)<Math.abs(60*a*4/D-120)?x:a,1);best={n,b:60*n*4/D}}return {n:best.n,bpm:Math.max(60,Math.min(240,Math.round(best.b)))}}
+function freeClose(){const fc=freeCap;freeCap=null;const D=ctx.currentTime-fc.t0;
+  if(D<.4||!fc.ev.length){flash('LOOP LIVRE CANCELADO\ntoque notas entre os dois toques');return}
+  const {n,bpm}=freeBars(D);S.bpm=bpm;const sd=stepDur(),L=n*16,t=S.perf.tracks[fc.i];Object.assign(t,newTrack(),{fb:t.fb,mute:t.mute});
+  t.len=n;t.ev=Array.from({length:L},()=>[]);for(const [sl,k,tt] of fc.ev){const st=((Math.round((tt-fc.t0)/sd)%L)+L)%L;if(!t.ev[st].some(e=>e[0]===sl&&e[1]===k))t.ev[st].push([sl,k,1,1])}
+  t.layers=1;t.st='ovd';t.pass=trSnap(t);t.touched=false;S.perf.free=false;dirty();startPlay(false);
+  flash(`LOOP LIVRE · ${n} COMP · ${bpm} BPM`,2600)}
 function perfPress(i){ensureCtx();perfSel=i;const t=S.perf.tracks[i];
+  if(freeCap){if(freeCap.i===i)freeClose();return}
+  if(S.perf.free&&!playing&&perfEmpty()){freeCap={i,t0:ctx.currentTime,ev:[]};flash('LOOP LIVRE · TOQUE AS NOTAS E A FAIXA DE NOVO');return}
   const pi=perfPend.findIndex(p=>p.i===i&&p.a!=='mute');if(pi>=0){perfPend.splice(pi,1);return}
   const next={empty:'rec',rec:'close',ovd:'play',play:'ovd'}[t.st];
   if(next==='rec'||next==='ovd')S.perf.tracks.forEach((o,j)=>{if(j!==i&&(o.st==='rec'||o.st==='ovd')&&!perfPend.some(p=>p.i===j&&p.a!=='mute'))perfPend.push({i:j,a:'play'})});
@@ -991,8 +1004,9 @@ function setSty(el,k,v){const kk='_s'+k;if(el[kk]!==v){el[kk]=v;el.style.setProp
 function conf(n,l){return armed[n]&&armed[n]>performance.now()?'confirmar?':l}
 function needConf(n){if(armed[n]&&armed[n]>performance.now()){armed[n]=0;return false}armed[n]=performance.now()+2500;return true}
 
-const curPages=()=>chopOn?CPAGES:mode==='fx'?MPAGES:PAGES,curPage=()=>chopOn?0:mode==='fx'?mpage:page;
-function getKnob(i){if(chopOn)return i===0?S.chopSens:[4,8,16].indexOf(S.chopGrid)/2;
+const curPages=()=>texV?TPAGES:chopOn?CPAGES:mode==='fx'?MPAGES:PAGES,curPage=()=>texV||chopOn?0:mode==='fx'?mpage:page;
+function getKnob(i){if(texV)return i===0?S.tex.vol:S.tex.f;
+  if(chopOn)return i===0?S.chopSens:[4,8,16].indexOf(S.chopGrid)/2;
   if(mode==='fx')return mixGet(MPAGES[mpage].k[i]);
   if(page===3){const I=S.slots[S.curSound].ins||{t:0,a:.5};return i===0?I.t/3:I.a}
   const sl=S.slots[S.curSound],key=PAGES[page].k[i];
@@ -1009,7 +1023,8 @@ function mixSet(k,v){const M=S.mix;
     default:M[k]=v}
   if(lockOn&&playing&&k!=='dj'){flash('TRAVA SÓ VALE PARA O DJ')}
   if(AU&&k!=='ds'&&k!=='fade'&&k!=='dp')mixApply(AU);dirty()}
-function setKnob(i,v){v=clamp01(v);if(chopOn){if(i===0)S.chopSens=Math.round(v*20)/20;else S.chopGrid=[4,8,16][Math.round(v*2)];dirty();return}
+function setKnob(i,v){v=clamp01(v);if(texV){if(i===0)S.tex.vol=v;else S.tex.f=v;texTune();dirty();return}
+  if(chopOn){if(i===0)S.chopSens=Math.round(v*20)/20;else S.chopGrid=[4,8,16][Math.round(v*2)];dirty();return}
   if(mode==='fx'){mixSet(MPAGES[mpage].k[i],v);return}
   if(page===3){const sl=S.slots[S.curSound];sl.ins={...(sl.ins||{t:0,a:.5})};if(i===0)sl.ins.t=Math.min(3,Math.round(v*3));else sl.ins.a=Math.round(v*100)/100;if(AU)insApply(AU,S.curSound);dirty();return}
   const sl=S.slots[S.curSound],key=PAGES[page].k[i];
@@ -1017,6 +1032,7 @@ function setKnob(i,v){v=clamp01(v);if(chopOn){if(i===0)S.chopSens=Math.round(v*2
   if(lockOn&&playing&&visCur){const P_=S.patterns[visCur.pat],L=P_.lk[S.curSound],ls=locAt(P_,S.curSound,visCur.real);L[ls]={...(L[ls]||{}),[key]:v};dirty();return}
   sl.params[key]=v;dirty()}
 function fmt(key,v){
+  if(key==='tv')return `${Math.round(v*100)}`;if(key==='tf')return v>.98?'aberto':`${Math.round(80*Math.pow(2,v*8))}Hz`;
   if(key==='cs')return `${Math.round(v*100)}`;if(key==='cg')return `${S.chopGrid}`;
   if(key==='it')return INSL[Math.round(v*3)];if(key==='ia')return `${Math.round(v*100)}`;
   if(key==='dp'||key==='du'||key==='dn')return `${Math.round(v*100)}%`;
@@ -1026,7 +1042,7 @@ function fmt(key,v){
   if(key==='f')return v<.47?`LP ${Math.round((1-v/.47)*100)}`:v>.53?`HP ${Math.round((v-.53)/.47*100)}`:'aberto';
   return `${Math.round(v*100)}`}
 
-function setMode(m){const prev=mode;mode=m;if(m!=='sound')chopExit();polyEd=false;stepEd=false;selStep=-1;if(prev==='sound'&&m!=='sound'&&micOn){micOn=false;closeMic()}copyArm=null;chainOn=false;if(m!=='fx'&&!fxLatch)heldFx=-1;if(m!=='play')eraseOn=false;$('app').dataset.mode=m}
+function setMode(m){const prev=mode;mode=m;if(m!=='sound'){chopExit();texV=false}polyEd=false;stepEd=false;selStep=-1;if(prev==='sound'&&m!=='sound'&&micOn){micOn=false;closeMic()}copyArm=null;chainOn=false;if(m!=='fx'&&!fxLatch)heldFx=-1;if(m!=='play')eraseOn=false;$('app').dataset.mode=m}
 function setVis(on){S.vis=on;$('gl').style.visibility=on?'visible':'hidden';if(on)glInit();dirty()}
 
 /* --- pads --- */
@@ -1034,9 +1050,10 @@ function padDown(k){ensureCtx();const cs=S.curSound,sl=S.slots[cs];
   if(calib){calibTap();return}
   switch(mode){
     case 'play':sl.lastKey=k;pressT[k]=ctx.currentTime;if(eraseOn&&liveRecOn&&playing)break;if(liveRecOn&&playing)liveRec(k);else playNow(cs,k);break;
-    case 'perf':{sl.lastKey=k;pressT[k]=ctx.currentTime;playNow(cs,k);const b=playing?nearest():null;if(b)perfAdd(cs,k,b.g);break}
+    case 'perf':{sl.lastKey=k;pressT[k]=ctx.currentTime;playNow(cs,k);if(freeCap){freeCap.ev.push([cs,k,touchT(ctx.currentTime)]);break}const b=playing?nearest():null;if(b)perfAdd(cs,k,b.g);break}
     case 'steps':{if(S.layView)break;const st=viewPage()*16+k;if(st<sComp(ep(),S.curSound))stepEd?stepPick(st):toggleStep(st);break}
-    case 'sound':if(chopOn){if(chopTap){chopTapBtn();break}const m=chopMarks();if(k<m.length){chopSel=k;const [a,b]=chopRegion(k);playRegion(cs,a,b)}break}
+    case 'sound':if(texV){if(!samples[k]){flash('SOM VAZIO');break}const was=!!texN;if(was)texPlay();S.tex.s=k;S.tex.frz=false;dirty();if(was)texPlay();break}
+      if(chopOn){if(chopTap){chopTapBtn();break}const m=chopMarks();if(k<m.length){chopSel=k;const [a,b]=chopRegion(k);playRegion(cs,a,b)}break}
       if(micOn){startSampling(k);break}if(copyArm==='sound'){copySound(cs,k);copyArm=null}else{S.curSound=k;flash(`SOM ${pad(k+1)} ${S.slots[k].name||'VAZIO'}`);if(samples[k])playNow(k,S.slots[k].lastKey)}dirty();break;
     case 'pattern':if(chainOn){if(chainBuild.length<128){chainBuild.push(k);applyChain(chainBuild.slice())}break}if(copyArm==='pattern'){copyPattern(k);copyArm=null}else applyChain([k]);break;
     case 'fx':if(k===15){heldFx=-1;flash('SEM EFEITO')}else if(fxLatch)heldFx=heldFx===k?-1:k;else heldFx=k;
@@ -1047,7 +1064,25 @@ function layToggle(s,st){const p=ep();if(st>=sComp(p,s))return;const a=p.n[s][st
   if(a.length){a.length=0;p.lk[s][st]=null}else{a.push(sl.lastKey);if(!playing&&samples[s])playNow(s,sl.lastKey)}
   S.curSound=s;dirty()}
 
-function texLabel(){return 'textura'}
+/* ===================== TEXTURA: base ambiente em loop, fora da grade ===================== */
+let texV=false,texN=null;      // tela da textura aberta · nós tocando {src,flt,g,t0,buf,main}
+const TPAGES=[{n:'TEX',k:['tv','tf'],l:['vol','filtro']}];
+function texLabel(){return texN?'textura ●':'textura'}
+/* buffer em loop com cruzamento: o fim entra suave no começo */
+function texBuf(d,rate,a=0,b=1){const s0=Math.floor(a*d.length),s1=Math.max(s0+64,Math.floor(b*d.length)),n=s1-s0,X=Math.min(Math.floor(rate*.1),n>>2),L=n-X,o=new Float32Array(L);
+  for(let i=0;i<L;i++)o[i]=d[s0+i];for(let i=0;i<X;i++){const w=i/X;o[i]=d[s0+i]*w+d[s0+L+i]*(1-w)}return mkBuf(o,rate)}
+function texNode(buf,off=0){const src=ctx.createBufferSource(),flt=ctx.createBiquadFilter(),g=ctx.createGain();src.buffer=buf;src.loop=true;
+  flt.type='lowpass';flt.frequency.value=80*Math.pow(2,S.tex.f*8);flt.Q.value=.7;src.connect(flt);flt.connect(g);g.connect(AU?AU.duck:master);   // antes do DUCK: pulsa com o bumbo
+  const t=ctx.currentTime+.01;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(S.tex.vol*.9,t+.08);src.start(t,off%buf.duration);return {src,flt,g,t0:t-off,buf}}
+function texFade(n){if(!n)return;const t=ctx.currentTime;try{n.g.gain.cancelScheduledValues(t);n.g.gain.setValueAtTime(n.g.gain.value,t);n.g.gain.linearRampToValueAtTime(0,t+.06);n.src.stop(t+.08)}catch(e){}}
+function texPlay(){ensureCtx();const s=S.tex.s;if(s<0||!samples[s]){flash('ESCOLHA UM SOM NOS PADS');return}
+  if(texN){texFade(texN);texN=null;S.tex.frz=false;return}texN=texNode(texBuf(samples[s].data,samples[s].rate));texN.main=texN.buf}
+function texFreeze(){if(!texN){flash('TOQUE ▶ ANTES');return}const main=texN.main,old=texN;
+  if(!S.tex.frz){const pos=((ctx.currentTime-old.t0)%main.duration+main.duration)%main.duration,a=pos/main.duration,g=Math.min(.12,main.duration/4)/main.duration;   // congela num grão de 120 ms
+    texN=texNode(texBuf(main.getChannelData(0),main.sampleRate,Math.min(a,1-g),Math.min(1,a+g)));texN.main=main;texN.mainPos=pos;S.tex.frz=true}
+  else{texN=texNode(main,old.mainPos||0);texN.main=main;S.tex.frz=false}
+  texFade(old)}
+function texTune(){if(!texN)return;const t=ctx.currentTime;texN.flt.frequency.setTargetAtTime(80*Math.pow(2,S.tex.f*8),t,.03);texN.g.gain.setTargetAtTime(S.tex.vol*.9,t,.03)}
 /* ===================== CHOP: fatiar a amostra do som atual ===================== */
 /* ataques: energia em janelas de 10 ms (passo 2,5 ms); um ataque é um salto de energia (em dB) acima do limiar.
    O início é refinado para a primeira amostra acima de 10% do pico seguinte. sens 0–1 (mais = mais fatias). */
@@ -1062,7 +1097,7 @@ function detectAttacks(d,rate,sens=.5){const W=Math.round(rate*.01),H=Math.round
       let k=a;while(k<b&&Math.abs(d[k])<pk*.1)k++;out.push(k);last=i}}
   const fr=out.map(k=>k/d.length);if(!fr.length||fr[0]>.01)fr.unshift(0);return fr.slice(0,16)}
 const chopMarks=()=>S.slots[S.curSound].marks||(S.slots[S.curSound].marks=[0]);
-function chopStart(){const cs=S.curSound;if(!samples[cs]){flash('GRAVE OU CARREGUE UM SOM ANTES');return}
+function chopStart(){texV=false;const cs=S.curSound;if(!samples[cs]){flash('GRAVE OU CARREGUE UM SOM ANTES');return}
   const sl=S.slots[cs];if(!Array.isArray(sl.marks)||!sl.marks.length)sl.marks=cs>=8?[...new Set(sl.slices.map(x=>Math.round(x.st*1e4)/1e4))].sort((a,b)=>a-b):[0];
   chopOn=true;micOn=false;closeMic();copyArm=null;chopSel=-1;wavePk=null;$('disp').classList.add('chop');flash('CHOP · TAP, ATAQUES OU GRADE')}
 function chopExit(){if(!chopOn)return;chopStopTap();chopOn=false;$('disp').classList.remove('chop')}
@@ -1165,6 +1200,9 @@ function act(a){ensureCtx();const cs=S.curSound,sl=S.slots[cs];
     case 'layView':S.layView=!S.layView;dirty();break;
     case 'micRec':micOn=!micOn;copyArm=null;if(micOn)openMic();else closeMic();break;
     case 'chop':chopOn?chopExit():chopStart();break;
+    case 'tex':texV=!texV;if(texV){chopExit();if(micOn){micOn=false;closeMic()}if(S.tex.s<0&&samples[cs])S.tex.s=cs;flash('TEXTURA · PADS ESCOLHEM O SOM')}break;
+    case 'texPlay':texPlay();break;
+    case 'texFrz':texFreeze();break;
     case 'cTap':chopTapBtn();break;
     case 'cAtk':chopStopTap();chopAttacks();break;
     case 'cGrid':chopStopTap();chopGrid();break;
@@ -1187,6 +1225,7 @@ function act(a){ensureCtx();const cs=S.curSound,sl=S.slots[cs];
     case 'fb+':tr.fb=Math.min(100,tr.fb+5);dirty();break;
     case 'pq':{const Q=['comp','tempo','livre'];S.perf.q=Q[(Q.indexOf(S.perf.q)+1)%3];dirty();flash(`AÇÕES ENTRAM ${{comp:'NO PRÓXIMO COMPASSO',tempo:'NO PRÓXIMO TEMPO',livre:'NO PRÓXIMO PASSO'}[S.perf.q]}`);break}
     case 'resamp':resample();break;
+    case 'pFree':if(playing||!perfEmpty()){flash('BPM LOOP: PARE E LIMPE AS FAIXAS');break}S.perf.free=!S.perf.free;dirty();flash(S.perf.free?'BPM LOOP · O 1º LOOP DEFINE O TEMPO':'BPM FIXO');break;
     case 'pUndo':
       if(tr.st==='ovd'&&tr.touched&&tr.pass){tr.redo.push(trSnap(tr));trRestore(tr,tr.pass);tr.touched=false;flash(`F${perfSel+1} · VOLTA DESFEITA`)}
       else if(tr.undo.length){tr.redo.push(trSnap(tr));trRestore(tr,tr.undo.pop());tr.layers=Math.max(1,tr.layers-1);if(tr.st==='ovd')tr.pass=trSnap(tr);flash(`F${perfSel+1} · DESFEITO`)}
@@ -1213,6 +1252,7 @@ function ctxHTML(){const cs=S.curSound,sl=S.slots[cs],p=ep();
         return B('rat',`rat ${l.rat||1}`,l.rat>1?'on':'')+B('mi-','−','sm')+T(`mic ${l.mi>0?'+':''}${Math.round((l.mi||0)*100)}`)+B('mi+','+','sm')+B('cond',CONDL[l.cd||0],l.cd?'on':'')+(cs<8?B('tie','tie',l.tie?'on':''):'')+B('stepEd','ok','on')}
       return B('note-','−','sm')+`<span class="hint n">${cs<8?noteName(sl.lastKey):'F'+(sl.lastKey+1)}</span>`+B('note+','+','sm')+B('layView','todos')+B('stepEd','passo')+(np>1?B('comp',`${p.len} pas`)+fol:comp)+lim}
     case 'sound':{if(micOn){const t=micState==='ready'?'segure um pad':micState==='asking'?'aceite o mic':micState==='denied'?'mic negado · arquivo':micState==='blocked'?'sem mic · arquivo':'abrindo mic…';return T(t)+B('micRec','sair do mic','on')+B('del',conf('del','apagar'))}
+      if(texV)return B('texPlay',texN?'■ parar':'▶ tocar',texN?'on':'')+B('texFrz','freeze',S.tex.frz?'on':'')+T(S.tex.s>=0?`som ${pad(S.tex.s+1)}`:'escolha um pad')+B('tex','ok','on');
       if(chopOn)return B('cTap',chopTap?'tap ●':'▶ tap',chopTap?'rec on':'')+B('cAtk','ataques')+B('cGrid',`grade ${S.chopGrid}`)+B('cDist','distribuir')+B('chop','ok','on');
       return B('copy',copyArm==='sound'?'destino?':'copiar…',copyArm==='sound'?'on':'')+B('load','carregar')+B('micRec','mic')+B('chop','chop')+B('tex',texLabel())+B('del',conf('del','apagar'))}
     case 'pattern':if(chainOn)return T(chainBuild.length?chainBuild.map(x=>x+1).join('›'):'toque em ordem')+B('chUndo','desfazer')+B('chNew','nova')+B('chainM','pronto','on');
@@ -1312,7 +1352,7 @@ function renderLayers(pat,vs,vp){const cs=S.curSound,full=false,L=vlen(pat),c0=f
       if(on&&pat.lk[s][st])k+=' lk';if(st===lph)k+=' ph';if(st>=C_)k+=' off';setCls(c,k)}}
 }
 function renderPerf(){const P=S.perf,cur=playing?visCur:null,tr=P.tracks[perfSel];
-  setHTML($('phd'),`<span class="pt">F${perfSel+1}</span><button data-a="fb-" class="sm" aria-label="Feedback menos">−</button><b>FB ${tr.fb}%</b><button data-a="fb+" class="sm" aria-label="Feedback mais">+</button><span class="sp"></span><button data-a="pq">Q ${P.q}</button><button data-a="resamp">reamost.</button>`);
+  setHTML($('phd'),`<span class="pt">F${perfSel+1}</span><button data-a="fb-" class="sm" aria-label="Feedback menos">−</button><b>FB ${tr.fb}%</b><button data-a="fb+" class="sm" aria-label="Feedback mais">+</button><span class="sp"></span><button data-a="pq">Q ${P.q}</button>${perfEmpty()&&!playing||P.free?`<button data-a="pFree" class="${P.free?'on':''}">${P.free?'bpm loop':'bpm fixo'}</button>`:''}<button data-a="resamp">reamost.</button>`);
   const fr=cur&&ctx?clamp01((ctx.currentTime-cur.time)/stepDur()):0;
   P.tracks.forEach((t,i)=>{const E=perfEls[i],pend=perfPend.find(p=>p.i===i&&p.a!=='mute'),pm=perfPend.some(p=>p.i===i&&p.a==='mute');
     setCls(E.c,'pcard'+(i===perfSel?' sel':''));
@@ -1340,11 +1380,12 @@ function render(){
   setTxt($('dSnd'),`SOM ${pad(cs+1)}`);setTxt($('dPat'),`PADRÃO ${pad(pi+1)}·${L}`);setTxt($('dBpm'),`${S.bpm} BPM`);setTxt($('dMem'),`MEM ${(MEM-usedMem()).toFixed(0)}S`);
   let big=(sl.name||'vazio').toUpperCase(),hot=false;
   if(calib){big=`CALIBRAR ${calib.taps.length}/8`;hot=true}
+  else if(freeCap&&ctx){big=`LIVRE ● ${(actx-freeCap.t0).toFixed(1)}S`;hot=true}
   else if(counting){big=`REC ▸ ${Math.max(1,Math.ceil((countEnd-actx)/(stepDur()*4)))}`;hot=true}
   else if(mode==='perf'&&perfPend.length){const p=perfPend.find(x=>x.i===perfSel)||perfPend[0];big=`F${p.i+1} ▸ ${ALB[p.a]}`;hot=true}
   setTxt($('dBig'),big);setCls($('dBig'),hot?'hot':'');
   const ml=MODES.find(x=>x[0]===mode)[1].toUpperCase();
-  setTxt($('dSub'),`${ml} · ${vs>=0?vs+1:'-'}/${L}${np>1?` · PÁG ${vp+1}/${np}`:''} · ${playing?'TOCANDO':'PARADO'}${liveRecOn?' · REC':''}${metOn()?' · MET':''}${lockOn?' · TRAVA':''}${S.rept?' · REPT '+RL[S.rept]:''}${eraseOn?' · BORR.':''}${fillOn?' · FILL':''}${AU&&AU.lim&&AU.lim.reduction<-3?' · LIM':''}`);
+  setTxt($('dSub'),`${ml} · ${vs>=0?vs+1:'-'}/${L}${np>1?` · PÁG ${vp+1}/${np}`:''} · ${playing?'TOCANDO':'PARADO'}${liveRecOn?' · REC':''}${metOn()?' · MET':''}${lockOn?' · TRAVA':''}${S.rept?' · REPT '+RL[S.rept]:''}${eraseOn?' · BORR.':''}${fillOn?' · FILL':''}${texN?' · TEX':''}${AU&&AU.lim&&AU.lim.reduction<-3?' · LIM':''}`);
   let m;
   if(calib)m=`TOQUE UM PAD JUNTO COM O CLIQUE · ${calib.taps.length}/8`;
   else if(recSlot>=0&&ctx)m=`● GRAVANDO SOM ${pad(recSlot+1)} ${(recLen/ctx.sampleRate).toFixed(1)}S`;
@@ -1388,7 +1429,8 @@ function render(){
       case 'perf':
       case 'play':{const h=actx-padHit[k];if(h>=0&&h<.12)c+=' hit';if(k===sl.lastKey)c+=' dim';lab=cs<8?noteName(k):'';break}
       case 'steps':{const st=vp*16+k;num=String(st+1);if(st>=CL){c+=' off';break}const n=pat.n[cs][st];if(n.length)c+=' on';if(st===lv)c+=' ph';if(stepEd&&st===selStep)c+=' sel';{const l=pat.lk[cs][st],rt=l?richTxt(l):'';lab=n.length?(cs<8?noteName(n[0]):'fatia '+(n[0]+1))+(rt?' · '+rt.toLowerCase():l?' · trava':''):''}break}
-      case 'sound':if(chopOn){const m=chopMarks();if(k<m.length){c+=' on';lab=`${Math.round((chopRegion(k)[1]-chopRegion(k)[0])*samples[cs].data.length/samples[cs].rate*1000)} ms`}else{c+=' empty';lab=''}if(k===chopSel)c+=' sel';break}
+      case 'sound':if(texV){if(samples[k])c+=' on';else c+=' empty';if(k===S.tex.s)c+=' sel';lab=k===S.tex.s?(texN?(S.tex.frz?'congelado':'tocando'):'textura'):(S.slots[k].name||'');break}
+        if(chopOn){const m=chopMarks();if(k<m.length){c+=' on';lab=`${Math.round((chopRegion(k)[1]-chopRegion(k)[0])*samples[cs].data.length/samples[cs].rate*1000)} ms`}else{c+=' empty';lab=''}if(k===chopSel)c+=' sel';break}
         if(micOn){if(k===recSlot)c+=' ph';if(samples[k])c+=' on';else c+=' empty';if(k===cs)c+=' sel';lab=samples[k]?(samples[k].data.length/samples[k].rate).toFixed(1)+'s':'vazio';break}if(k===cs)c+=' sel';if(!samples[k])c+=' empty';else c+=' on';if(copyArm==='sound'&&k!==cs)c+=' arm';lab=S.slots[k].name||'vazio';break;
       case 'pattern':{if(chainOn){const pos=[];chainBuild.forEach((x,i)=>{if(x===k)pos.push(i+1)});if(pos.length)c+=' on';if(playing&&k===pi)c+=' ph';lab=pos.slice(0,4).join('·')+(pos.length>4?'…':'');break}const has=S.patterns[k].n.some(r=>r.some(x=>x.length));if(has)c+=' on';if(k===pi)c+=' sel';if(copyArm==='pattern'&&k!==pi)c+=' arm';lab=S.chain.includes(k)&&S.chain.length>1?'na cadeia':(has?S.patterns[k].len+' passos':'');break}
       case 'fx':if(k===heldFx)c+=' sel';if(pat.fx.slice(0,L).includes(k))c+=' on';lab=FXS[k];break;

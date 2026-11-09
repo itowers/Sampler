@@ -190,11 +190,26 @@ T['9.8 CHOP']=async()=>{const N='9.8 CHOP',bad=[];
   E(`S.curSound=2;chopStart();S.chopGrid=4;chopGrid()`);const g=E('chopMarks().slice()');if(JSON.stringify(g)!=='[0,0.25,0.5,0.75]')bad.push('grade 4 errada');E('chopExit()');
   rec(N,!bad.length,bad.length?bad.join(' · '):`8 ataques achados, erro máx ${ms(err)} (limite 5 ms) · distribuídos no som ${to+1} · grade ok`)};
 
+T['extra · loop livre e textura']=async()=>{const N='extra · loop livre e textura',bad=[];
+  const fb=D=>E(`freeBars(${D})`);
+  const a=fb(2),b=fb(1.6),c=fb(5.5);
+  if(!(a.n===1&&a.bpm===120))bad.push(`2 s → ${a.n}c ${a.bpm}`);if(!(b.n===1&&b.bpm===150))bad.push(`1,6 s → ${b.n}c ${b.bpm}`);
+  if(!(c.n===2&&c.bpm>=70&&c.bpm<=180))bad.push(`5,5 s → ${c.n}c ${c.bpm}`);
+  // loop livre: 2 s com notas em 0, 0,5 e 1,0 s → 1 compasso a 120 BPM, notas nos passos 1, 5 e 9
+  reset();E(`ensureCtx();S.perf.free=true;freeCap={i:0,t0:ctx.currentTime-2,ev:[[8,0,ctx.currentTime-2+.01],[8,1,ctx.currentTime-1.5-.02],[8,2,ctx.currentTime-1]]};freeClose();stopPlay()`);
+  const t=E(`(()=>{const t=S.perf.tracks[0];return {len:t.len,st:t.ev.map((a,i)=>a.length?i:-1).filter(i=>i>=0),bpm:S.bpm,free:S.perf.free}})()`);
+  if(!(t.len===1&&JSON.stringify(t.st)==='[0,4,8]'&&t.bpm===120&&!t.free))bad.push(`loop livre: ${JSON.stringify(t)}`);
+  // textura: o ponto de volta do loop não tem salto
+  const j=E(`(()=>{const d=new Float32Array(44100);for(let i=0;i<d.length;i++)d[i]=Math.sin(2*Math.PI*137.3*i/44100);const b=texBuf(d,44100),x=b.getChannelData(0);return Math.abs(x[x.length-1]-x[0])})()`);
+  if(!(j<.05))bad.push(`salto no loop da textura ${j.toFixed(3)}`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`BPM pelo loop: 2 s → 120, 1,6 s → 150, 5,5 s → ${c.n} comp a ${c.bpm} · notas quantizadas nos passos 1, 5, 9 · loop da textura sem salto (${j.toFixed(3)})`)};
+
 /* persistência: cada fase acrescenta campos em PERSIST (expressão que monta, expressão que confere) */
 const PERSIST=[
   ['passo rico e calibração',`S.patterns[2].lk[3][7]={rat:3,mi:-.2,cd:4,tie:true};S.latAdj=-23`,`JSON.stringify(S.patterns[2].lk[3][7])==='{"rat":3,"mi":-0.2,"cd":4,"tie":true}'&&S.latAdj===-23`],
   ['mix e INSERT',`S.mix.dp=.6;S.mix.dj=.3;S.mix.dk={s:9,k:2};S.slots[4].ins={t:2,a:.7};S.patterns[2].mx[5]={dj:.8}`,`S.mix.dp===.6&&S.mix.dj===.3&&S.mix.dk.s===9&&S.slots[4].ins.t===2&&S.patterns[2].mx[5].dj===.8`],
   ['marcas do CHOP',`S.slots[3].marks=[0,.25,.6]`,`JSON.stringify(S.slots[3].marks)==='[0,0.25,0.6]'`],
+  ['textura',`S.tex={s:5,vol:.3,f:.4,frz:false}`,`S.tex.s===5&&S.tex.vol===.3&&S.tex.f===.4`],
   ['comp/div por som',`S.patterns[2].sc[5]={c:12,d:2}`,`S.patterns[2].sc[5].c===12&&S.patterns[2].sc[5].d===2`],
 ];
 T['9.9 persistência']=async()=>{const N='9.9 persistência';
