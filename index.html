@@ -285,7 +285,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <h3>Efeitos</h3>
  <p class="note">1 loop 16 · 2 loop 12 · 3 loop curto · 4 loop + curto · 5 uníssono · 6 uníssono grave · 7 oitava ↑ · 8 oitava ↓ · 9 stutter 4 · 10 stutter 3 · 11 scratch · 12 scratch rápido · 13 quantização 6/8 · 14 retrigger · 15 reverso · 16 sem efeito</p>
  <h3>Visual</h3>
- <p class="note">Ferrofluido no visor: cada pad é um ímã na posição dele, sons melódicos levantam um anel, BPM pulsa no play. Filtro arredonda/afia os espinhos, ressonância muda a densidade. ⛶ abre em tela cheia.</p>
+ <p class="note">Ferrofluido no visor: cada pad é um ímã na posição dele, sons melódicos levantam um anel, BPM pulsa no play. ⛶ abre em tela cheia.</p>
  <p class="note">O master tem um limitador: quando ele aperta mais de 3 dB, o visor mostra LIM. Memória total de 40 s. No iPhone, desligue o modo silencioso. Padrões e sons ficam salvos só neste navegador.</p>
 </div></div>
 
@@ -895,19 +895,11 @@ vec2 fld(vec2 p){
   M+=1.2*uM*exp(-rd*rd/.0016);
   return vec2(d,M);
 }
-float lat(vec2 p,float sc){p*=sc;vec2 r=vec2(1.,1.732),h=r*.5;vec2 a=mod(p,r)-h,b=mod(p-h,r)-h;vec2 g=dot(a,a)<dot(b,b)?a:b;return clamp(1.-length(g)*2.,0.,1.);}
 float hgt(vec2 p){
   vec2 f=fld(p);gD=f.x;
-  float lp=clamp((.47-uF)/.47,0.,1.),hp=clamp((uF-.53)/.47,0.,1.);
   float body=.045*sqrt(clamp(-f.x/.04,0.,1.));
   float amp=smoothstep(.15,.75,f.y)*smoothstep(0.,-.035,f.x)*(.09+.14*uV);
-  vec2 lpos=rot((uP-.5)*1.2)*p;
-  float sc=mix(9.,26.,uQ);
-  float c=lat(lpos,sc);
-  float sp=pow(c,mix(1.5,.75,hp));
-  sp=mix(sp,smoothstep(0.,1.,c)*.8,lp);
-  if(uFx>3.5&&uFx<5.5)sp=max(sp,.7*pow(lat(lpos+.37/sc,sc*mix(1.5,.6,isfx(5.))),1.2));
-  return body+amp*sp;
+  return body+amp*.5;
 }
 vec3 env(vec3 r,vec3 acc){
   vec3 c=mix(vec3(.05),vec3(.32),smoothstep(-.4,1.,r.y));
@@ -944,9 +936,7 @@ void main(){
 const FS_DISP=`precision mediump float;uniform sampler2D uTex;uniform vec2 uR;uniform float uInv,uT;
 void main(){vec2 uv=gl_FragCoord.xy/uR;vec3 c=texture2D(uTex,uv).rgb;
  if(uInv>.5)c=vec3(1.)-c;
- float v=1.;
- float n=fract(sin(dot(gl_FragCoord.xy+uT,vec2(12.9898,78.233)))*43758.5453);
- gl_FragColor=vec4(c*v+(n-.5)*.012,1.);}`;
+ gl_FragColor=vec4(c,1.);}`;
 function glProg(fs){const mk=(t,src)=>{const sh=gl.createShader(t);gl.shaderSource(sh,src);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(sh));return sh};
   const p=gl.createProgram();gl.attachShader(p,mk(gl.VERTEX_SHADER,VS));gl.attachShader(p,mk(gl.FRAGMENT_SHADER,fs));gl.bindAttribLocation(p,0,'a');gl.linkProgram(p);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p}
