@@ -43,7 +43,7 @@ function onsets(buf,thr=.02,gap=.04){const d=buf.getChannelData(0),r=buf.sampleR
 /* som de clique: 16 fatias de 0,2 s, cada uma com um tom de 30 ms no início */
 function clickKit(rate=44100){const n=Math.round(.2*rate),d=new Float32Array(n*16);
   for(let s=0;s<16;s++)for(let i=0;i<Math.round(.03*rate);i++)d[s*n+i]=(i%40<20?.8:-.8);return d}
-function reset(){E(`factory();heldFx=-1;fxRec=false;page=0;S.swing=0;S.bpm=120;S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;pendingChain=null;undoSt=[];perfPend=[];S.perf=newPerf();S.loops=newLoops();DEV=DEVDEF();
+function reset(){E(`factoryClassic();heldFx=-1;fxRec=false;page=0;S.swing=0;S.bpm=120;S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;pendingChain=null;undoSt=[];perfPend=[];S.perf=newPerf();S.loops=newLoops();DEV=DEVDEF();
   globalThis.TL=(p,s,i,o)=>{const x=stpMk(p,s,i);for(const q in o){if(RICH.includes(q))x[q]=o[q];else (x.l||(x.l={}))[q]=o[q]}};`)}
 function useClicks(slot=8){A.__ck=clickKit();E(`samples[${slot}]={data:window.__ck,rate:44100};invalidate(${slot});S.instr[${slot}]=newSlot('clique')`)}
 function goldenSetup(){reset();E(`S.bpm=120;S.swing=30;S.vol=8;
@@ -334,6 +334,46 @@ T['11.9 superfície por tipo de som']=async()=>{const N='11.9 superfície por ti
   E(`samples[1]={data:window.__ck||new Float32Array(4410),rate:44100};invalidate(1);S.instr[1]=newSlot('importada');S.curSound=1;`);
   const g=E(`kbEv(4).notes.join()`);if(g!=='7,11,14')bad.push('acorde na amostra '+g);
   rec(N,!bad.length,bad.length?bad.join(' · '):'sons 1–8: teclado (inteiro em Tocar, só teclas em Perf, faixa em Passos) · sons 9–16: pads · amostra importada vira teclado')};
+
+/* ---------- sons sintetizados, biblioteca e espaço (melhorias do DuoSampler) ---------- */
+const rmsAt=(buf,a,z)=>{const d=buf.getChannelData(0),r=buf.sampleRate;let s=0,n=0;for(let i=Math.max(0,Math.round(a*r));i<Math.min(d.length,Math.round(z*r));i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0};
+T['12.1 synth: sustenta, solta e não usa memória']=async()=>{const N='12.1 synth: sustenta, solta e não usa memória',bad=[];
+  reset();const mc=E('usedMem()');E(`factory();S.bpm=120;S.swing=0;S.cenas=[];S.chain=chainOf([0]);S.curPattern=0;`);const ms0=E('usedMem()');
+  if(Math.abs(mc-21.5)>.01)bad.push(`fábrica antiga ${mc.toFixed(1)} s`);if(ms0!==0)bad.push(`fábrica nova usa ${ms0} s`);
+  const d=E('stepDur()');
+  // du = 4 passos: soa durante e solta depois
+  E(`const p=newPattern();p.len=16;addK(p,0,0,0);TL(p,0,0,{du:4});S.patterns[0]=p;`);let r=await render({steps:16,dry:true});
+  const ev=r.ev.find(e=>e.s===0),inG=rmsAt(r.buf,r.t0+.3,r.t0+.45),after=rmsAt(r.buf,r.t0+4*d+.35,r.t0+4*d+.5);
+  if(!ev||Math.abs(ev.gate-4*d)>1e-6)bad.push(`gate ${ev&&ev.gate}`);if(!(inG>.05))bad.push(`sem som no meio da nota (${inG.toFixed(3)})`);if(!(after<.005))bad.push(`não soltou (${after.toFixed(4)})`);
+  // sem du: soa até a próxima nota (tie não conta); nota sozinha = 1 compasso
+  E(`const p=newPattern();p.len=16;addK(p,0,0,0);addK(p,0,1,0);TL(p,0,1,{tie:true});addK(p,0,5,7);S.patterns[0]=p;`);r=await render({steps:16,dry:true});
+  const g=r.ev.filter(e=>e.s===0).map(e=>+(e.gate/d).toFixed(2));if(JSON.stringify(g)!=='[4.9,10.78]')bad.push(`gates ${g}`);
+  // kit sintetizado: prato e 808 passam de 0,2 s (a fatia de amostra cortava ali)
+  E(`const p=newPattern();p.len=16;addK(p,8,0,13);addK(p,9,8,1);S.patterns[0]=p;`);r=await render({steps:16,dry:true});
+  const pr=rmsAt(r.buf,r.t0+.3,r.t0+.4),b8=rmsAt(r.buf,r.t0+8*d+.3,r.t0+8*d+.4);if(!(pr>.004))bad.push(`prato curto (${pr.toFixed(4)})`);if(!(b8>.004))bad.push(`808 curto (${b8.toFixed(4)})`);
+  // ao vivo: segura até soltar e grava a duração no passo
+  const live=E(`(()=>{ensureCtx();const v=playNow(0,0);const a=v.end;v.off(ctx.currentTime+.05);return [a===Infinity,isFinite(v.end)]})()`);if(!(live[0]&&live[1]))bad.push('nota ao vivo não segurou/soltou');
+  E(`TST.fakeLat=0;DEV.latAdj=0;S.patterns[0]=newPattern();S.curPattern=0;const n=ctx.currentTime;sched=[];for(let i=0;i<8;i++)sched.push({time:n+(i-4)*${d},real:i,step:i,pat:0,g:i,dice:{}});
+    const loc=liveRecNs(0,[0,4,7]);relH({loc,t0:ctx.currentTime-.375,vcs:[]});TST.fakeLat=null;sched=[]`);
+  const du=E('S.patterns[0].tr[0].p[4]&&S.patterns[0].tr[0].p[4].du');if(du!==3)bad.push(`duração gravada ${du}`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`fábrica nova 0 s de memória (antiga ${mc.toFixed(1)} s) · nota com du 4 soa e solta · sem du vai até a próxima nota (${g.join(', ')} passos) · prato e 808 passam de 0,2 s · ao vivo segura até soltar e grava 3 passos`)};
+T['12.2 reverb e eco']=async()=>{const N='12.2 reverb e eco',bad=[];
+  reset();useClicks();const d=E('S.bpm=120;stepDur()');E(`const p=newPattern();p.len=16;addK(p,8,0,0);S.patterns[0]=p;S.mix.et=2;S.mix.ef=.35;`);
+  const tail=async()=>{const r=await render({steps:16,bare:true});return [rmsAt(r.buf,r.t0+.08,r.t0+.3),rmsAt(r.buf,r.t0+3*d-.01,r.t0+3*d+.03),rmsAt(r.buf,r.t0+2*d,r.t0+3*d-.03)]};
+  const dry=await tail();E('S.instr[8].params.rv=1');const rv=await tail();E('S.instr[8].params.rv=0;S.instr[8].params.ec=1');const ec=await tail();
+  if(!(dry[0]<.002&&rv[0]>.01))bad.push(`reverb: cauda ${dry[0].toFixed(4)} → ${rv[0].toFixed(4)}`);
+  if(!(ec[1]>.02&&ec[2]<ec[1]/3))bad.push(`eco: repetição ${ec[1].toFixed(4)} (antes ${ec[2].toFixed(4)})`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):`reverb deixa cauda (${rv[0].toFixed(3)} contra ${dry[0].toFixed(4)} seco) · eco repete em 3 passos (1/8 pontuada)`)};
+T['12.3 biblioteca e migração do synth']=async()=>{const N='12.3 biblioteca e migração do synth',bad=[];
+  reset();const a=E(`loadSyn(1,'m',9);[S.instr[1].syn.t,S.instr[1].syn.id,samples[1]===null,S.instr[1].name]`);if(a.join()!=='m,9,true,Acid')bad.push('preset '+a);
+  const b=E(`loadSyn(12,'k',6);[S.instr[12].syn.t,S.instr[12].syn.id,S.instr[12].name]`);if(b.join()!=='k,6,Kit Techno')bad.push('kit '+b);
+  const c=E(`loadClassic(1,1);[!!samples[1],S.instr[1].syn,S.instr[1].name]`);if(!(c[0]&&c[1]===null&&c[2]==='Lead'))bad.push('amostra '+c);
+  const x=E(`(()=>{const o=JSON.parse(JSON.stringify(S));delete o.instr[0].params.rv;o.instr[2].syn={t:'m',id:999};o.instr[3].syn={t:'k',id:2};delete o.mix.ef;const m=migrate(o);return [m.instr[0].params.rv,m.instr[2].syn,m.instr[3].syn.id,m.mix.ef]})()`);
+  if(JSON.stringify(x)!=='[0,null,2,0.35]')bad.push('migração '+JSON.stringify(x));
+  const cp=E(`(()=>{const k=S.instr[12].syn;copySound(12,2);return S.instr[2].syn})()`);if(cp)bad.push('kit copiado para melodia');
+  rec(N,!bad.length,bad.length?bad.join(' · '):'preset e kit entram sem amostra · amostra antiga volta da biblioteca · projeto antigo ganha rv/ec/eco e descarta synth inválido · kit não vai para som de melodia')};
+PERSIST.push(['synth e espaço',`S.instr[5]=synSlot('m',30,'vib',{rv:.4,ec:.2});S.instr[13]=synSlot('k',6,'tec');S.instr[13].kp={3:[.2,.8]};S.mix.ef=.5;S.mix.et=1;addK(S.patterns[2],5,4,7);TL(S.patterns[2],5,4,{du:2.5})`,
+  `S.instr[5].syn.id===30&&S.instr[5].params.rv===.4&&S.instr[5].params.ec===.2&&S.instr[13].syn.t==='k'&&S.instr[13].kp[3][1]===.8&&S.mix.ef===.5&&S.mix.et===1&&S.patterns[2].tr[5].p[4].du===2.5`]);
 
 /* testes registrados pelas fases seguintes */
 window.T=T;
