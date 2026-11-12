@@ -20,14 +20,19 @@
 html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(160deg,#f6f5f1,#e2e1dc) fixed;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;overscroll-behavior:none}
 body{touch-action:manipulation}
 button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation}
-#app{height:100vh;height:100dvh;max-width:1100px;margin:0 auto;padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:var(--g)}
-#ctrl{display:flex;flex-direction:column;gap:var(--g);flex:none;min-width:0}
+/* duas metades iguais e uma faixa vazia de 12 px no meio (a dobra): em cima visor e controles, embaixo transporte e
+   pads; no layout largo, esquerda e direita. Margens de cima e de baixo iguais para a faixa cair no meio da tela. */
+#app{--pv:max(8px,env(safe-area-inset-top),env(safe-area-inset-bottom));height:100vh;height:100dvh;max-width:1100px;margin:0 auto;padding:var(--pv) max(10px,env(safe-area-inset-right)) var(--pv) max(10px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:var(--g)}
+#ctrl{display:flex;flex-direction:column;gap:var(--g);flex:1 1 0;min-height:0;min-width:0}
+#fold{flex:0 0 12px;display:flex;align-items:center}#fold i{display:block;flex:1;height:1px;background:#00000017}
+#bot{flex:1 1 0;min-height:0;min-width:0;display:flex;flex-direction:column;gap:var(--g)}
+#bot .trans{flex:none}
 /* teclas (skeumorfismo): face clara, borda e base pretas; ligada = afundada e preta */
 .tile,.modes button,.ctx button,.seg button,.trans button,.lock,.mbtn,.card .x,.lname,.lm,.ls,.pbig,.pmute,.phd button{background:var(--key);border:1px solid var(--edge);box-shadow:var(--keysh);transition:transform .04s}
 .modes button:active,.ctx button:active,.seg button:active,.trans button:active,.lock:active,.mbtn:active,.tile.big:active,.lname:active,.lm:active,.ls:active,.pbig:active,.pmute:active,.phd button:active{transform:translateY(2px);box-shadow:0 0 0 var(--base),inset 0 1px 3px #0002}
 .modes button.on,.ctx button.on,.seg button.on,.lock.on,.trans .tg.on,.trans .fill.on,.phd button.on,.trans .play.on,.lm.on,.ls.on,.pmute.on{background:var(--keyon);color:#fff;box-shadow:var(--keyonsh);transform:translateY(1px)}
 /* visor: afundado no corpo */
-#disp{position:relative;background:var(--panel);border:1.5px solid var(--ink);border-radius:clamp(14px,2.4dvh,24px);flex:0 0 clamp(118px,23dvh,280px);overflow:hidden;padding:clamp(10px,1.6dvh,16px) clamp(12px,2vw,18px) clamp(10px,1.4dvh,14px);display:flex;flex-direction:column;box-shadow:0 1px 0 #fff}
+#disp{position:relative;background:var(--panel);border:1.5px solid var(--ink);border-radius:clamp(14px,2.4dvh,24px);flex:1 1 auto;min-height:0;overflow:hidden;padding:clamp(10px,1.6dvh,16px) clamp(12px,2vw,18px) clamp(10px,1.4dvh,14px);display:flex;flex-direction:column;box-shadow:0 1px 0 #fff}
 #disp::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 3px 10px #00000040,inset 0 0 0 3px #f6f5f1b0;pointer-events:none;z-index:3}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
 #disp>*:not(#gl){position:relative;z-index:1}
@@ -108,7 +113,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 .trans .fill{flex:.7 1 0}
 .trans .tg.half{box-shadow:var(--keysh),inset 0 -3px 0 var(--hi)}
 /* pads */
-#padzone{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;background:#e4e3de;border-radius:clamp(18px,3dvh,30px) clamp(18px,3dvh,30px) 0 0;margin:0 calc(-1*max(10px,env(safe-area-inset-left))) calc(-1*max(8px,env(safe-area-inset-bottom)));padding:clamp(8px,1.6dvh,16px) max(10px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-bottom));box-shadow:inset 0 3px 8px #00000024,0 -1px 0 #fff}
+#padzone{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;background:#e4e3de;border-radius:clamp(18px,3dvh,30px) clamp(18px,3dvh,30px) 0 0;margin:0 calc(-1*max(10px,env(safe-area-inset-left))) calc(-1*var(--pv));padding:clamp(8px,1.6dvh,16px) max(10px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-bottom));box-shadow:inset 0 3px 8px #00000024,0 -1px 0 #fff}
 #pads{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:clamp(6px,1.1dvh,12px);padding-bottom:4px}
 .pad{position:relative;border-radius:clamp(10px,1.8dvh,18px);background:linear-gradient(#fff,#eceae5);border:1px solid var(--edge);box-shadow:0 3px 0 var(--base),0 5px 10px #00000012,inset 0 1px 0 #fff;touch-action:none;cursor:pointer;min-width:0;min-height:0;transition:transform .04s}
 .pad .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(17px,3.4dvh,36px);font-weight:600;color:#2a2a2a}
@@ -171,14 +176,16 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 .lcells div.off{opacity:.2}
 /* performance (looper de notas) */
 #perf{display:none;flex:none;flex-direction:column;gap:6px;margin-bottom:clamp(6px,1.1dvh,12px)}
-.phd{display:flex;gap:5px;align-items:center;height:clamp(30px,4.2dvh,40px)}
+.phd{display:flex;gap:5px;align-items:center;height:clamp(28px,3.8dvh,40px)}
 .phd .pt{font:11px var(--px);padding:0 4px}
 .phd b{font:10px var(--px);min-width:64px;text-align:center;white-space:nowrap}
 .phd button{height:100%;border-radius:9px;font-size:12px;font-weight:700;padding:0 10px;white-space:nowrap;margin-bottom:2px}
 .phd button.sm{width:34px;padding:0;font-size:18px}
 .phd .sp{flex:1}
 .ptr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-.pcard{display:flex;flex-direction:column;gap:4px;padding:4px;border-radius:12px;min-width:0}
+/* cartão da faixa: estado e M lado a lado; embaixo o som da faixa, a mini-faixa e o resumo */
+.pcard{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"big mute" "info info";gap:4px;padding:4px;border-radius:12px;min-width:0}
+.pcard .pbig{grid-area:big}.pcard .pmute{grid-area:mute;width:clamp(28px,7vw,40px);height:auto;padding:0}.pcard .pinfo{grid-area:info}
 .pcard.sel{box-shadow:0 0 0 1.5px #555;background:#f6f5f1}
 .pbig{height:clamp(50px,7.4dvh,76px);border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;margin-bottom:2px}
 .pring{flex:none;width:clamp(22px,3.4dvh,32px);height:clamp(22px,3.4dvh,32px);border-radius:50%;background:conic-gradient(var(--c,#999) var(--p,0%),#d9d8d3 0);-webkit-mask:radial-gradient(circle,transparent 50%,#000 52%);mask:radial-gradient(circle,transparent 50%,#000 52%)}
@@ -187,7 +194,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 .pbig.live{color:var(--hit)}
 .pbig.arm{background:linear-gradient(#fff4ee,#ffd6c2);border-color:var(--hi);box-shadow:0 2px 0 var(--base),0 0 0 2px var(--hi),0 0 14px #ff4f0055;color:var(--hit)}
 .pinfo{min-width:0;cursor:pointer}
-.pinfo canvas{display:block;width:100%;height:12px}
+.pinfo canvas{display:block;width:100%;height:9px}
 .pins{font:8.5px/1.3 var(--px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);margin-bottom:2px}
 .pcard.sel .pins{text-decoration:underline}
 .lgrid button.dim{opacity:.45}
@@ -210,17 +217,14 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 #app[data-kb=perf] #kJoy button{font-size:0}#app[data-kb=perf] #kJoy button b{font-size:12px}
 #app[data-kb=perf] .kkey .c{font-size:clamp(9.5px,1.3dvh,12px);padding:0 1px}
 @media not all and (min-width:760px) and (min-aspect-ratio:5/4){
-  #app[data-mode=perf] #disp{flex-basis:clamp(112px,17dvh,220px)}
   #app[data-mode=perf] #dBig{font-size:clamp(18px,3.4dvh,34px);margin-top:2px}
-  #app[data-mode=perf] #strip div{height:clamp(12px,2dvh,22px)}
-  .pbig{height:clamp(44px,6dvh,64px)}.pmute{height:clamp(24px,3.2dvh,32px)}
+  .pbig{height:clamp(36px,5dvh,56px)}.pmute{height:clamp(22px,2.9dvh,30px)}
 }
 /* layout largo (dobrável aberto na horizontal, tablet) */
 @media (min-width:760px) and (min-aspect-ratio:5/4){
   #app{flex-direction:row}
-  #ctrl{flex:1 1 52%;}
-  #disp{flex:1 1 auto}
-  #padzone{flex:1 1 48%;margin:0;border-radius:26px;padding:14px}
+  #fold{flex-direction:column}#fold i{width:1px;height:auto;flex:1}
+  #padzone{margin:0;border-radius:26px;padding:14px}
 }
 @media (max-width:460px){
   .params.p4{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr) minmax(0,1fr) auto}
@@ -292,6 +296,9 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
    <div class="sl" data-k="1"><i></i><span class="a"></span><span class="v"></span></div>
    <button class="lock" data-a="lock" aria-label="Trava de parâmetro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
   </div>
+ </div>
+ <div id="fold" aria-hidden="true"><i></i></div>
+ <div id="bot">
   <div class="trans">
    <button class="rec" data-a="rec" aria-label="Gravar ao vivo"></button>
    <button class="play" data-a="play" id="playB" aria-label="Play">▶</button>
@@ -299,14 +306,14 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
    <button class="tg fill" id="fillB" aria-label="Fill: segure ou toque para travar">FILL</button>
    <button class="ic" data-a="menu" aria-label="Menu">⋯</button>
   </div>
+  <div id="padzone"><div id="perf"><div class="phd" id="phd"></div><div class="ptr" id="ptr"></div></div><div id="kbd"><div class="krow" id="kSty"></div><div class="kmid"><div id="kJoy"></div><div class="kg" id="kGrid"></div></div><div id="kKeys"></div></div><div id="pads"></div><div id="layers"></div></div>
  </div>
- <div id="padzone"><div id="perf"><div class="phd" id="phd"></div><div class="ptr" id="ptr"></div></div><div id="kbd"><div class="krow" id="kSty"></div><div class="kmid"><div id="kJoy"></div><div class="kg" id="kGrid"></div></div><div id="kKeys"></div></div><div id="pads"></div><div id="layers"></div></div>
 </div>
 
 <div id="help" class="ov hidden"><div class="card">
  <button class="x" data-close>fechar</button>
  <h2>COMO USAR</h2>
- <p class="note">Escolha o que os 16 pads fazem na fileira de modos. A linha logo abaixo mostra as ações daquele modo.</p>
+ <p class="note">Escolha o que os 16 pads fazem na fileira de modos. A linha logo abaixo mostra as ações daquele modo. A tela é dividida em duas metades com uma faixa vazia no meio, para a dobra do aparelho: em cima o visor e os controles, embaixo o transporte e os pads (no aparelho aberto na horizontal, esquerda e direita).</p>
  <table>
  <tr><td>Tocar</td><td>sons 9–16 (batida e amostras) tocam nos 16 pads. Sons 1–8 (melodia) tocam no teclado de 7 acordes, no estilo do DuoSynth. ● REC parado = contagem de 1 compasso e começa gravando; tocando = liga/desliga a gravação sem parar a música. Cada volta soma notas (overdub)</td></tr>
  <tr><td>teclado</td><td>7 teclas = os 7 graus do tom (I ii iii IV V vi vii°). Estilo: Acorde · Strum (notas em sequência rápida) · Arp · Nota (uma nota por tecla). Joystick: toque numa direção e ela fica (↑ troca maior/menor · ↗ 7 · → maj7/m7 · ↘ 9 · ↓ sus4 · ↙ 6/sus2 · ← dim · ↖ aug); ● volta ao acorde base. No estilo Nota o joystick vira ↑↓ oitava e ←→ semitom. TOM − + e escala valem para o padrão; OIT e inversão, para o som. Arp: velocidade, ordem, ritmo (rit 1–6) e alcance em oitavas, no tempo do BPM</td></tr>
@@ -1874,7 +1881,7 @@ function buildUI(){
   // perf: 4 faixas
   const Tr=$('ptr');
   for(let i=0;i<4;i++){const c=document.createElement('div');c.className='pcard';
-    c.innerHTML=`<button class="pbig" data-a="pt${i}"><i class="pring"></i><span class="pl"></span></button><div class="pinfo" data-a="ps${i}"><div class="pins"></div><canvas width="160" height="24"></canvas><div class="pmeta"></div></div><button class="pmute" data-a="pm${i}">MUTE</button>`;
+    c.innerHTML=`<button class="pbig" data-a="pt${i}"><i class="pring"></i><span class="pl"></span></button><div class="pinfo" data-a="ps${i}"><div class="pins"></div><canvas width="160" height="24"></canvas><div class="pmeta"></div></div><button class="pmute" data-a="pm${i}" aria-label="Mute da faixa ${i+1}">M</button>`;
     Tr.appendChild(c);perfEls.push({c,ins:c.querySelector('.pins'),big:c.querySelector('.pbig'),ring:c.querySelector('.pring'),pl:c.querySelector('.pl'),cv:c.querySelector('canvas'),meta:c.querySelector('.pmeta'),mute:c.querySelector('.pmute')})}
   document.querySelectorAll('.sl').forEach(sd=>{const i=+sd.dataset.k;let act=false;
     const setFrom=e=>{const r=sd.getBoundingClientRect();setKnob(i,(e.clientX-r.left)/r.width)};
