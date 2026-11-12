@@ -429,6 +429,31 @@ T['15.1 QUANT livre']=async()=>{const N='15.1 QUANT livre',bad=[];
   const r=await render({steps:16,dry:true}),ev=r.ev.find(e=>e.s===0);if(!ev||Math.abs((ev.t-r.t0)/d-4.3)>.011)bad.push('tocou em '+(ev&&((ev.t-r.t0)/d).toFixed(2)));
   E(`S.rq='grade'`);
   rec(N,!bad.length,bad.length?bad.join(' · '):'livre: toque 0,3 passo depois grava micro +30% e toca em 4,3 · 1/16 grava no passo, sem micro · Perf livre guarda −20%')};
+/* ---------- amostra: cortar, reverso e gate ---------- */
+T['16.1 cortar e reverso']=async()=>{const N='16.1 cortar e reverso',bad=[];
+  reset();const m0=E('usedMem()');
+  const a=E(`(()=>{const d0=samples[0].data,n=d0.length;S.instr[0].params.st=.25;S.instr[0].params.ln=.5;const i0=Math.floor(.25*n),len=Math.ceil((.25+.5*.75)*n)-i0;
+    const ok=cutSample(0),d=samples[0].data;let same=true;for(let i=200;i<d.length-200;i+=97)if(d[i]!==d0[i0+i]){same=false;break}
+    return [ok,d.length===len,same,S.instr[0].params.st,S.instr[0].params.ln]})()`);
+  if(JSON.stringify(a)!=='[true,true,true,0,1]')bad.push('melodia '+JSON.stringify(a));
+  const b=E(`(()=>{const sl=S.instr[8];for(let k=8;k<16;k++)sl.slices[k]={...sl.slices[k-8]};const n=samples[8].data.length,ok=cutSample(8);
+    return [ok,Math.abs(samples[8].data.length/n-.5)<.01,+sl.slices[1].st.toFixed(4),+sl.slices[1].ln.toFixed(4)]})()`);
+  if(JSON.stringify(b)!=='[true,true,0.125,0.125]')bad.push('bateria '+JSON.stringify(b));
+  const freed=m0-E('usedMem()');if(!(freed>2.3))bad.push(`liberou só ${freed.toFixed(2)} s`);
+  const c=E(`(()=>{const d0=samples[1].data.slice();S.instr[1].params.st=.1;S.instr[1].params.ln=.5;revSample(1);const d=samples[1].data,P=S.instr[1].params;
+    const e0=.1+.5*.9;return [d[0]===d0[d0.length-1],Math.abs(P.st-(1-e0))<1e-9,Math.abs(P.st+P.ln*(1-P.st)-(1-.1))<1e-9]})()`);
+  if(JSON.stringify(c)!=='[true,true,true]')bad.push('reverso '+JSON.stringify(c));
+  const r=E(`(()=>{const sl=S.instr[9];const s3=sl.slices[3];revSample(9);return Math.abs(sl.slices[3].st-(1-(s3.st+s3.ln)))<1e-9})()`);if(!r)bad.push('reverso da bateria');
+  rec(N,!bad.length,bad.length?bad.join(' · '):`cortar guarda só o trecho (melodia e fatias da bateria) e libera ${freed.toFixed(1)} s · reverso inverte e mantém o mesmo trecho em cada pad`)};
+T['16.2 gate da amostra']=async()=>{const N='16.2 gate da amostra',bad=[];
+  reset();const d=E('S.bpm=120;stepDur()');E(`const p=newPattern();p.len=16;addK(p,1,0,0);TL(p,1,0,{du:2});S.patterns[0]=p;`);
+  const tailAt=async()=>{const r=await render({steps:16,dry:true});return rmsAt(r.buf,r.t0+2*d+.06,r.t0+2*d+.2)};
+  const one=await tailAt();E('S.instr[1].gate=true');const gt=await tailAt();
+  if(!(one>.02&&gt<.002))bad.push(`one-shot ${one.toFixed(3)} · segura ${gt.toFixed(4)}`);
+  const live=E(`(()=>{ensureCtx();const v=playNow(1,0),t=ctx.currentTime;v.off(t+.05);return v.end<=t+.1})()`);if(!live)bad.push('ao vivo não parou');
+  const os=E(`(()=>{S.instr[1].gate=false;const v=playNow(1,0),t=ctx.currentTime,e=v.end;v.off(t+.05);return v.end===e})()`);if(!os)bad.push('one-shot parou ao soltar');
+  rec(N,!bad.length,bad.length?bad.join(' · '):`com segura a nota de 2 passos para no fim (${gt.toFixed(4)}) e ao soltar a tecla · one-shot segue até o fim (${one.toFixed(3)})`)};
+PERSIST.push(['gate',`S.instr[6].gate=true`,`S.instr[6].gate===true`]);
 PERSIST.push(['quant livre',`S.rq='livre'`,`S.rq==='livre'`]);
 PERSIST.push(['faixas do Perf',`Object.assign(S.loops[2],{inst:5,fx:{v:.5,p:.3,f:.2,d:.4,r:.6,e:.1}})`,`S.loops[2].inst===5&&S.loops[2].fx.d===.4&&S.loops[2].fx.e===.1&&S.loops[2].fx.p===.3`]);
 PERSIST.push(['synth e espaço',`S.instr[5]=synSlot('m',30,'vib',{rv:.4,ec:.2});S.instr[13]=synSlot('k',6,'tec');S.instr[13].kp={3:[.2,.8]};S.mix.ef=.5;S.mix.et=1;addK(S.patterns[2],5,4,7);TL(S.patterns[2],5,4,{du:2.5})`,

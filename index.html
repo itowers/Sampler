@@ -265,6 +265,8 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 .lgrid button:active{transform:translateY(2px)}
 .lgrid button.on{background:var(--keyon);color:#fff;box-shadow:var(--keyonsh)}
 .lgrid button.wide{grid-column:span 2;font-weight:600}
+#libS .lgrid{grid-template-columns:repeat(3,minmax(0,1fr));margin:6px 0 4px}
+#libS p{margin:8px 0 0;font:10px/1.3 var(--px);letter-spacing:.06em}
 </style>
 </head>
 <body>
@@ -332,6 +334,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <tr><td>MET</td><td>metrônomo: desligado → só gravando (traço laranja) → sempre (preto). Contagem e volume no menu ⋯</td></tr>
  <tr><td>Som</td><td>escolhe um dos 16 sons · copiar · sons (biblioteca: 48 presets sintetizados em 6 categorias, 12 kits sintetizados, as amostras da fábrica antiga e arquivo de áudio) · mic · chop · textura · apagar</td></tr>
  <tr><td>synth</td><td>presets e kits sintetizados não usam a memória de 40 s. Nos sons de melodia a nota sustenta enquanto a tecla está apertada; gravando ao vivo, o passo guarda quanto tempo você segurou. No padrão, sem esse tempo, a nota soa até a próxima nota do mesmo som (no máximo 1 compasso; tie estende). Os kits seguem a ordem do Kit 1: 1 bumbo · 2 808 (no tom do padrão) · 3–4 caixas · 5 palma · 6–7 chimbais · 8 ride · 9–11 tons · 12 aro · 13 cowbell · 14 prato · 15 shaker · 16 zap</td></tr>
+ <tr><td>amostra</td><td>em Som › sons, quando o som é uma amostra: cortar = aplica início e dur (na bateria, o trecho usado pelas fatias) e libera a memória do resto (dois toques) · reverso = inverte a amostra (cada pad segue na mesma batida) · one-shot / segura = a amostra toca até o fim ou para quando você solta a tecla (e no padrão, no fim da nota)</td></tr>
  <tr><td>chop</td><td>fatia a amostra do som atual. ▶ tap toca a amostra: toque tap (ou qualquer pad) em cada fatia. ataques = acha as batidas (sens no slider) · grade = partes iguais (4, 8 ou 16 no slider). No visor: arraste uma marca para mover, toque no vazio para criar, dois toques para apagar. Os pads tocam cada fatia. distribuir = as fatias viram os pads de um som de bateria (o atual ou o primeiro livre de 9–16)</td></tr>
  <tr><td>textura</td><td>toca um som em loop, fora da grade, como base. Os pads escolhem o som · ▶ tocar / ■ parar · freeze congela num grão curto · sliders: volume e filtro. Pulsa junto com o DUCK</td></tr>
  <tr><td>Padrão</td><td>escolhe um dos 16 padrões · copiar para · montar cadeia (toque padrões em ordem, até 128; o mesmo padrão seguido vira ×2, ×3…) · comp · limpar</td></tr>
@@ -353,12 +356,13 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <p class="note">1 loop 16 · 2 loop 12 · 3 loop curto · 4 loop + curto · 5 uníssono · 6 uníssono grave · 7 oitava ↑ · 8 oitava ↓ · 9 stutter 4 · 10 stutter 3 · 11 scratch · 12 scratch rápido · 13 quantização 6/8 · 14 retrigger · 15 reverso · 16 sem efeito</p>
  <h3>Visual</h3>
  <p class="note">Ferrofluido no visor: cada pad é um ímã na posição dele, sons melódicos levantam um anel, BPM pulsa no play. ⛶ abre em tela cheia.</p>
- <p class="note">O master tem um limitador: quando ele aperta mais de 3 dB, o visor mostra LIM. Memória total de 40 s, só para amostras (presets e kits sintetizados não usam). No iPhone, desligue o modo silencioso. Padrões e sons ficam salvos só neste navegador.</p>
+ <p class="note">O master tem um limitador: quando ele aperta mais de 3 dB, o visor mostra LIM. Memória total de 40 s, só para amostras (presets e kits sintetizados não usam). Se não ouvir nada no iPhone, desligue o modo silencioso (onde o Safari permite, o app já toca com ele ligado). Padrões e sons ficam salvos só neste navegador.</p>
 </div></div>
 
 <div id="lib" class="ov hidden"><div class="card">
  <button class="x" data-close>fechar</button>
  <h2 id="libT">SONS</h2>
+ <div id="libS"></div>
  <div class="seg lseg" id="libC"></div>
  <div class="lgrid" id="libG"></div>
  <p class="note" id="libN"></p>
@@ -820,8 +824,9 @@ async function importBackup(file){
   catch(e){flash('BACKUP INVÁLIDO\n'+String(e&&e.message||e).slice(0,40),3000)}}
 
 /* ===================== ÁUDIO ===================== */
+const audSess=t=>{try{if(navigator.audioSession&&navigator.audioSession.type!==t)navigator.audioSession.type=t}catch(e){}};
 function ensureCtx(){
-  if(!ctx){
+  if(!ctx){audSess('playback');
     ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
     AU=buildMaster(ctx);master=AU.inp;setVol();
     try{analyser=ctx.createAnalyser();analyser.fftSize=512;AU.out.connect(analyser);anBuf=new Float32Array(analyser.fftSize)}catch(e){}
@@ -931,6 +936,7 @@ function trigger(slot,key,t,o={}){
   off=Math.max(0,Math.min(off,D-.005));len=Math.max(.005,Math.min(len,D-off));
   let rate=Math.pow(2,semi/12);if(fx===6)rate*=2;if(fx===7)rate*=.5;
   let dur=len/rate;if(o.maxDur)dur=Math.min(dur,o.maxDur);
+  const gt=sl.gate&&!o.hold&&o.gate>0;if(gt)dur=Math.min(dur,o.gate+.03);   // som com gate: no padrão, para no fim da nota
   const vol=P.v*P.v*1.4*(o.gain??1);
   if(!drum&&!offl)cutVoices(VO[slot],t,o.grp);
   const flt=C.createBiquadFilter();
@@ -939,10 +945,10 @@ function trigger(slot,key,t,o={}){
   else{flt.type='lowpass';flt.frequency.value=20000}
   flt.Q.value=.7+P.r*16;
   const g=C.createGain();flt.connect(g);g.connect(OUT);
-  const fd=fx>=0?(DEV.fade||0)/1000:0,a=fd?Math.min(Math.max(.001,fd),dur/4):Math.min(.003,dur/4),rl=fd?Math.min(Math.max(.002,fd),dur/3):Math.min(.008,dur/3);   // FX de performance entram e saem com o fade
+  const fd=fx>=0?(DEV.fade||0)/1000:0,a=fd?Math.min(Math.max(.001,fd),dur/4):Math.min(.003,dur/4),rl=fd?Math.min(Math.max(.002,fd),dur/3):Math.min(gt?.03:.008,dur/3);   // FX de performance entram e saem com o fade
   if(CH&&S.mix.dp>0&&slot===S.mix.dk.s&&key===S.mix.dk.k)duckAt(CH,t);
   g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+a);g.gain.setValueAtTime(vol,Math.max(t+a,t+dur-rl));g.gain.linearRampToValueAtTime(0,t+dur);
-  const vc={t,end:t+dur,g,vol,srcs:[],grp:o.grp||0,off(){}};
+  const vc={t,end:t+dur,g,vol,srcs:[],grp:o.grp||0,off(t2){if(!sl.gate||!o.hold||vc.end<=t2+.01)return;t2=Math.max(t2,t+.005);holdAt(g.gain,t2,vol);g.gain.linearRampToValueAtTime(0,t2+.03);vc.srcs.forEach(x=>{try{x.stop(t2+.04)}catch(e){}});vc.end=t2+.04}};
   const gl=o.from!=null&&!drum&&fx!==10&&fx!==11?Math.pow(2,(o.from-key)/12):0;   // GLIDE: começa na nota anterior e desliza
   const mk=(r,det)=>{const s=C.createBufferSource();s.buffer=b;s.playbackRate.value=r;if(gl){s.playbackRate.setValueAtTime(r*gl,t);s.playbackRate.setTargetAtTime(r,t,Math.min(.06,dur/4))}if(det&&s.detune)s.detune.value=det;
     if(fx===10||fx===11){const cyc=Math.max(1,dur*(fx===11?14:4)),n=Math.max(32,Math.ceil(cyc*16)),c=new Float32Array(n);for(let i=0;i<n;i++)c[i]=r*Math.max(.08,1+.85*Math.sin(TAU*cyc*i/n));try{s.playbackRate.setValueCurveAtTime(c,t,Math.max(.01,dur))}catch(e){}}
@@ -1014,7 +1020,7 @@ function scheduleStep(){
       if(x.mi)tt+=x.mi<0?Math.max(x.mi*dur,-MICRO_MAX):x.mi*dur;
       if(x.rat>1)rat=x.rat;
       if(s<8)notes=follow(pat,s,notes,cm);
-      const m=n*rat,ww=w/m,gate=s<8?(m>1?ww*.9:stepGate(T,ls,x,dur/DIVF[T.d],sComp(pat,s))):0;
+      const m=n*rat,ww=w/m,gate=s<8||S.instr[s].gate?(m>1?ww*.9:stepGate(T,ls,x,dur/DIVF[T.d],sComp(pat,s))):0;
       if(cm&&(cm.t==='q'||cm.t==='ru'||cm.t==='rd')){const seq=cmSeq(pat,notes,cm);seq.forEach((k,i)=>trigger(s,k,tt+i*w,{lock,fx,maxDur:w*.95}));lastSemi[s]=seq[seq.length-1];continue}
       const from=cm&&cm.t==='gl'&&lastSemi[s]!=null?lastSemi[s]:null;
       for(const k of notes)for(let r=0;r<m;r++)trigger(s,k,tt+r*ww,{lock,fx,gain:rat>1?Math.pow(.9,r%rat):1,maxDur:m>1?ww*.95:0,gate,from:from!=null&&r===0?from+(k-notes[0]):null});
@@ -1197,7 +1203,7 @@ function loopFire(tr,ti,s,x,t,pos,L){const dur=stepDur();
   let tt=t;if(x.mi)tt+=x.mi<0?Math.max(x.mi*dur,-MICRO_MAX):x.mi*dur;
   const rat=x.rat>1?x.rat:1,ww=dur/rat,lock=x.l||null,tb=s===tr.inst?ti:null,fx=heldFx>=4?heldFx:-1,cm=s<8?x.cm:null,gn=j=>(x.g&&x.g[j]!=null?x.g[j]:1);
   if(cm&&(cm.t==='q'||cm.t==='ru'||cm.t==='rd')){cmSeq(S.patterns[playPat],x.k,cm).forEach((k,i)=>trigger(s,k,tt+i*dur,{lock,fx,gain:gn(0),maxDur:dur*.95,tb}));return}
-  const gate=s<8?(rat>1?ww*.9:stepGate(tr.tr[s],pos,x,dur,L)):0;
+  const gate=s<8||S.instr[s].gate?(rat>1?ww*.9:stepGate(tr.tr[s],pos,x,dur,L)):0;
   x.k.forEach((k,j)=>{for(let r=0;r<rat;r++)trigger(s,k,tt+r*ww,{lock,fx,gain:gn(j)*(rat>1?Math.pow(.9,r):1),gate,tb})})}
 function recTrack(s){const T=S.loops,a=T[perfSel],live=t=>(t.st==='rec'||t.st==='ovd')&&t.inst===s;if(live(a))return a;return T.find(live)}
 function perfAdd(s,k,g,fr){const t=recTrack(s);if(!t)return;let pos;
@@ -1270,12 +1276,12 @@ function liveRec(k){const slot=S.curSound;S.instr[slot].lastKey=k;const vc=playN
 function setMi(x,posF,d){if(S.rq!=='livre'||!x)return;const f=DIVF[d??1],m=Math.round((posF-Math.round(posF*f)/f)*100)/100;if(Math.abs(m)>=.02)x.mi=Math.max(-.5,Math.min(.5,m));else delete x.mi}
 /* soltar: encerra a nota (synth) e grava quanto tempo ela ficou apertada (passo.du, só melodia) */
 function relH(h){if(!h||!ctx)return;const now=ctx.currentTime;if(h.vc&&h.vc.off)h.vc.off(now);if(h.vcs)h.vcs.forEach(v=>v&&v.off&&v.off(now));if(h.loc)setDu(h.loc,now-h.t0)}
-function setDu(loc,held){if(!loc||loc.s>=8||S.rept||held<.02)return;const T=loc.p.tr[loc.s],x=T&&T.p[loc.ls];if(!x||!x.k.length)return;
+function setDu(loc,held){if(!loc||(loc.s>=8&&!S.instr[loc.s].gate)||S.rept||held<.02)return;const T=loc.p.tr[loc.s],x=T&&T.p[loc.ls];if(!x||!x.k.length)return;
   x.du=Math.max(.25,Math.min(64,Math.round(held/(stepDur()/DIVF[T.d])*4)/4));dirty()}
 function copySound(from,to){if(from===to)return;const s=samples[from],a=S.instr[from];
   if(a.syn&&(from>=8)!==(to>=8)){flash(from>=8?'KIT SINTETIZADO SÓ VAI PARA 9–16':'PRESET SINTETIZADO SÓ VAI PARA 1–8');return}
   samples[to]=s?{data:s.data.slice(),rate:s.rate}:null;
-  S.instr[to]=Object.assign(newSlot(a.name),{params:{...a.params},slices:(from>=8&&to>=8)?a.slices.map(x=>({...x})):defSlices(),lastKey:0,ins:{...(a.ins||{t:0,a:.5})},syn:a.syn?{...a.syn}:null},a.kp?{kp:cloneJ(a.kp)}:{});
+  S.instr[to]=Object.assign(newSlot(a.name),{params:{...a.params},slices:(from>=8&&to>=8)?a.slices.map(x=>({...x})):defSlices(),lastKey:0,ins:{...(a.ins||{t:0,a:.5})},syn:a.syn?{...a.syn}:null,gate:!!a.gate},a.kp?{kp:cloneJ(a.kp)}:{});
   invalidate(to);if(AU){insApply(AU,to);sendApply(AU,to)}samplesChanged();flash(`SOM ${pad(from+1)} → ${pad(to+1)} COPIADO`)}
 function copyPattern(to){const from=epIdx();if(from===to)return;S.patterns[to]=JSON.parse(JSON.stringify(S.patterns[from]));dirty();flash(`PADRÃO ${pad(from+1)} → ${pad(to+1)} COPIADO`)}
 function clearPattern(){const i=epIdx(),L=S.patterns[i].len;S.patterns[i]=newPattern();S.patterns[i].len=L;dirty();flash(`PADRÃO ${pad(i+1)} APAGADO`)}
@@ -1292,6 +1298,19 @@ function addCena(){const l=S.loops.map(t=>!!t.len&&!t.mute);if(!l.some(Boolean))
   if(ch.length===1&&ch[0].x===1&&!S.cenas[ch[0].c].l&&cenaP(ch[0])===pi)ch[0].c=c;
   else{const last=ch[ch.length-1];if(last.c===c)last.x++;else ch.push({c,x:1})}
   pruneCenas();dirty();flash(`CENA ${pad(pi+1)} + ${l.map((o,i)=>o?'F'+(i+1):'').filter(Boolean).join(' ')}\nCADEIA ${chainTxt(ch)}`,2400)}
+/* cortar de verdade: aplica início/dur (ou o trecho das fatias, na bateria) e libera a memória do resto */
+function cutSample(cs){const sm=samples[cs],sl=S.instr[cs];if(!sm)return false;const n=sm.data.length;let a,b;
+  if(cs>=8){a=Math.min(...sl.slices.map(x=>x.st));b=Math.max(...sl.slices.map(x=>Math.min(1,x.st+x.ln)))}else{const P=sl.params;a=P.st;b=P.st+P.ln*(1-P.st)}
+  const i0=Math.max(0,Math.floor(a*n)),i1=Math.min(n,Math.ceil(b*n));if(i1-i0<16||(i0===0&&i1===n))return false;
+  const w=(i1-i0)/n;sm.data=fades(sm.data.slice(i0,i1),.5,5);
+  if(cs>=8){sl.slices=sl.slices.map(x=>({st:clamp01((x.st-i0/n)/w),ln:Math.max(.001,x.ln/w)}));if(sl.marks)sl.marks=sl.marks.map(m=>(m-i0/n)/w).filter(m=>m>=0&&m<1)}
+  else{sl.params.st=0;sl.params.ln=1}
+  invalidate(cs);samplesChanged();return true}
+/* reverso: inverte a amostra; cada pad continua tocando a mesma batida, agora de trás para frente */
+function revSample(cs){const sm=samples[cs],sl=S.instr[cs];if(!sm)return false;sm.data=sm.data.slice().reverse();
+  if(cs>=8){sl.slices=sl.slices.map(x=>({st:clamp01(1-Math.min(1,x.st+x.ln)),ln:x.ln}));if(sl.marks)sl.marks=[...new Set(sl.marks.map(m=>Math.round((1-m)*1e5)/1e5))].filter(m=>m<1).sort((a,b)=>a-b)}
+  else{const P=sl.params,s0=P.st,e0=P.st+P.ln*(1-P.st);P.st=clamp01(1-e0);P.ln=e0>0?Math.max(.01,Math.min(1,(e0-s0)/e0)):1}   // o trecho [s0,e0] vira [1−e0,1−s0]
+  invalidate(cs);samplesChanged();return true}
 function setSample(slot,data,rate,name){
   samples[slot]={data,rate};S.instr[slot]=newSlot(name);invalidate(slot);samplesChanged();if(AU)insApply(AU,slot);
 }
@@ -1308,10 +1327,10 @@ async function openMic(){
   if(micState==='ready'||micState==='asking')return;
   ensureCtx();
   if(!micAllowed()){micState='blocked';return}
-  micState='asking';
+  micState='asking';audSess('play-and-record');
   try{
     const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
-    if(!micOn){st.getTracks().forEach(t=>t.stop());micState='off';return}   // saiu do modo enquanto o aviso estava aberto
+    if(!micOn){st.getTracks().forEach(t=>t.stop());micState='off';audSess('playback');return}   // saiu do modo enquanto o aviso estava aberto
     micStream=st;mic=ctx.createMediaStreamSource(st);
     micAn=ctx.createAnalyser();micAn.fftSize=512;micBuf=new Float32Array(micAn.fftSize);mic.connect(micAn);
     proc=ctx.createScriptProcessor(2048,1,1);const z=ctx.createGain();z.gain.value=0;mic.connect(proc);proc.connect(z);z.connect(ctx.destination);
@@ -1319,14 +1338,14 @@ async function openMic(){
     st.getAudioTracks()[0].addEventListener('ended',()=>closeMic());
     micState='ready';flash('MICROFONE PRONTO\nsegure um pad para gravar');
   }catch(e){
-    micState=(e&&(e.name==='NotAllowedError'||e.name==='SecurityError'))?'denied':'blocked';
+    micState=(e&&(e.name==='NotAllowedError'||e.name==='SecurityError'))?'denied':'blocked';audSess('playback');
     flash(micState==='denied'?'MIC NEGADO\nlibere nos ajustes do navegador':'MIC INDISPONÍVEL\nusando arquivo de áudio',2600);
   }
 }
 function closeMic(){
   if(recSlot>=0)stopSampling();
   try{if(proc){proc.onaudioprocess=null;proc.disconnect()}if(mic)mic.disconnect();if(micStream)micStream.getTracks().forEach(t=>t.stop())}catch(e){}
-  mic=proc=micStream=micAn=micBuf=null;micLevel=0;if(micState==='ready'||micState==='asking')micState='off'}
+  mic=proc=micStream=micAn=micBuf=null;micLevel=0;if(micState==='ready'||micState==='asking')micState='off';audSess('playback')}
 function micTick(){if(micAn&&micBuf){micAn.getFloatTimeDomainData(micBuf);let s=0;for(let i=0;i<micBuf.length;i++)s+=micBuf[i]*micBuf[i];const r=Math.min(1,Math.sqrt(s/micBuf.length)*4);micLevel+=(r-micLevel)*(r>micLevel?.6:.12)}}
 function micBars(){const n=Math.round(micLevel*10);return '▮'.repeat(n)+'▯'.repeat(10-n)}
 async function startSampling(k){
@@ -1664,6 +1683,8 @@ const libCats=()=>S.curSound>=8?['KITS','AMOSTRA']:[...SCATS,'AMOSTRA'];
 function libOpen(){const sl=S.instr[S.curSound],n=libCats().length;libCat=sl.syn?(sl.syn.t==='m'?SPRE[sl.syn.id].c:0):samples[S.curSound]?n-1:0;libRender();$('lib').classList.remove('hidden')}
 function libRender(){const cs=S.curSound,sl=S.instr[cs],drum=cs>=8,cats=libCats(),amo=libCat===cats.length-1,B=(a,t,c='')=>`<button data-l="${a}" class="${c}">${t}</button>`;
   $('libT').textContent=`SOM ${pad(cs+1)} · ${(sl.name||'vazio').toUpperCase()}`;
+  const sm=samples[cs];   // amostra no som: cortar de verdade, reverso e gate
+  setHTML($('libS'),sm?`<p>AMOSTRA ${(sm.data.length/sm.rate).toFixed(2)} S · LIVRE ${(MEM-usedMem()).toFixed(1)} S</p><div class="lgrid">${B('cut',conf('cut','cortar'),armed.cut>performance.now()?'on':'')}${B('rev','reverso')}${B('gate',sl.gate?'segura':'one-shot',sl.gate?'on':'')}</div><p class="note" style="font:12px/1.4 -apple-system,system-ui,sans-serif;letter-spacing:0">cortar aplica ${cs>=8?'o trecho das fatias':'início e dur (página CORT)'} e libera a memória do resto · segura = para ao soltar; one-shot = toca até o fim</p>`:'');
   setHTML($('libC'),cats.map((c,i)=>B('c'+i,c,i===libCat?'on':'')).join(''));
   let h='';
   if(amo){for(const i of drum?CLS_K:CLS_M)h+=B('x'+i,FNAMES[i],!sl.syn&&sl.cls===i?'on':'');h+=B('file','arquivo de áudio…','wide')}
@@ -1678,7 +1699,10 @@ function loadSyn(cs,t,id){const old=S.instr[cs],sl=synSlot(t,id,t==='m'?capz(SPR
   S.instr[cs]=sl;samples[cs]=null;invalidate(cs);samplesChanged();if(AU){insApply(AU,cs);sendApply(AU,cs)}libPreview(cs)}
 function loadClassic(cs,i){const c=classic()[i];if(!c)return;if(usedMem(cs)+c.data.length/c.rate>MEM){flash('MEMÓRIA CHEIA\napague um som');return}
   setSample(cs,c.data.slice(),c.rate,FNAMES[i]);S.instr[cs].cls=i;libPreview(cs)}
-function libAct(a){const cs=S.curSound,m=/^([ckmx])(\d+)$/.exec(a);
+function libAct(a){const cs=S.curSound,m=/^([ckmx])(\d+)$/.exec(a),sl=S.instr[cs];
+  if(a==='cut'){if(needConf('cut')){libRender();return}const f=MEM-usedMem();flash(cutSample(cs)?`CORTADA · +${(MEM-usedMem()-f).toFixed(1)}S LIVRES`:'NADA PARA CORTAR\najuste início e dur antes');dirty();libRender();return}
+  if(a==='rev'){revSample(cs);flash('AMOSTRA INVERTIDA');ensureCtx();playNow(cs,cs>=8?sl.lastKey:0,{gate:.6});dirty();libRender();return}
+  if(a==='gate'){sl.gate=!sl.gate;flash(sl.gate?'SEGURA · PARA AO SOLTAR':'ONE-SHOT · TOCA ATÉ O FIM');dirty();libRender();return}
   if(a==='file'){$('lib').classList.add('hidden');ensureCtx();openFile(cs);return}
   if(!m)return;const i=+m[2];
   if(m[1]==='c')libCat=i;else if(m[1]==='m')loadSyn(cs,'m',i);else if(m[1]==='k')loadSyn(cs,'k',i);else loadClassic(cs,i);
