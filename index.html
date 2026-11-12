@@ -319,7 +319,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <tr><td>FILL</td><td>toque = liga/desliga · segure = vale só enquanto pressionado. Toca os passos com condição FILL e cala os !FILL</td></tr>
  <tr><td>todos</td><td>em Passos, mostra todos os sons do padrão sobrepostos: uma linha por som, toque na célula para pôr/tirar nota. M = mute, S = solo. + mostrar os 16 sons. Toque no nome do som atual para mudar o comprimento (comp − +) e a divisão (‹ 1/16 ›) só dele: sons com comprimentos diferentes rodam juntos (polimetria), sempre contados do início do padrão</td></tr>
  <tr><td>faixa = som</td><td>no Perf, cada faixa toca um som (como os grupos do K.O. II): tocar na faixa já troca os pads ou o teclado para o som dela, e só ela grava esse som. O nome do som fica no cartão da faixa; toque nele de novo (▾) para escolher outro: outro som do mesmo tipo leva as notas junto; trocar melodia por batida apaga as notas (dois toques). Os sliders do Perf mexem no mix da faixa selecionada: NÍV (volume · pan), COR (filtro DJ · drive), ESP (reverb · eco). Sons de melodia mostram o joystick ao lado das teclas</td></tr>
- <tr><td>Perf</td><td>bpm loop (com tudo vazio e parado): toque a faixa, toque as notas e toque a faixa de novo; esse tempo vira o loop (1–8 compassos) e define o BPM. Depois volta a ser bpm fixo. Looper de 4 faixas de notas. O botão grande da faixa cicla REC → OVD (overdub) → PLAY → OVD. Toda ação entra no próximo compasso (Q muda para tempo ou livre). O primeiro loop arredonda para 1, 2, 4 ou 8 compassos. MUTE por faixa. desf por volta (refaz aparece depois de desfazer), comp 1·2·4·8 compassos (esticar duplica), limpar. FB: no overdub, as notas antigas perdem volume a cada volta. salvar = faixas viram um padrão livre. +cena = guarda o padrão atual com os loops que estão tocando e põe no fim da cadeia (aparece como 2+F1); quando a cadeia chega nela, só esses loops tocam. reamost. = grava as faixas em áudio num som livre (1–8)</td></tr>
+ <tr><td>Perf</td><td>bpm loop (com tudo vazio e parado): toque a faixa, toque as notas e toque a faixa de novo; esse tempo vira o loop (1–8 compassos) e define o BPM. Depois volta a ser bpm fixo. Looper de 4 faixas de notas. O botão grande da faixa cicla REC → OVD (overdub) → PLAY → OVD. Toda ação entra no próximo compasso (Q muda para tempo ou livre). O primeiro loop arredonda para 1, 2, 4 ou 8 compassos. MUTE por faixa. desf por volta (refaz aparece depois de desfazer), comp 1·2·4·8 compassos (esticar duplica), limpar. FB: no overdub, as notas antigas perdem volume a cada volta. salvar = faixas viram um padrão livre. passos = abre a faixa selecionada no modo Passos: as mesmas notas que o REC gravou, com passo rico (ratchet, micro, condição pela volta da faixa, tie, quebra/rampa); F1 ✕ volta ao padrão. +cena = guarda uma cópia das 4 faixas (notas, som e mix) com o padrão atual no fim da cadeia (aparece como 2+F1); daí em diante o que você muda vai para a cena nova. Quando a cadeia troca de cena tocando, as faixas da cena que sai ficam guardadas nela e as da próxima voltam. reamost. = grava as faixas em áudio num som livre (1–8)</td></tr>
  <tr><td>MET</td><td>metrônomo: desligado → só gravando (traço laranja) → sempre (preto). Contagem e volume no menu ⋯</td></tr>
  <tr><td>Som</td><td>escolhe um dos 16 sons · copiar · sons (biblioteca: 48 presets sintetizados em 6 categorias, 12 kits sintetizados, as amostras da fábrica antiga e arquivo de áudio) · mic · chop · textura · apagar</td></tr>
  <tr><td>synth</td><td>presets e kits sintetizados não usam a memória de 40 s. Nos sons de melodia a nota sustenta enquanto a tecla está apertada; gravando ao vivo, o passo guarda quanto tempo você segurou. No padrão, sem esse tempo, a nota soa até a próxima nota do mesmo som (no máximo 1 compasso; tie estende). Os kits seguem a ordem do Kit 1: 1 bumbo · 2 808 (no tom do padrão) · 3–4 caixas · 5 palma · 6–7 chimbais · 8 ride · 9–11 tons · 12 aro · 13 cowbell · 14 prato · 15 shaker · 16 zap</td></tr>
@@ -489,7 +489,7 @@ const stp=(p,s,i)=>p.tr[s].p[i];
 const nk=(p,s,i)=>{const x=p.tr[s].p[i];return x?x.k:NK};
 const hasN=(p,s,i)=>{const x=p.tr[s].p[i];return !!x&&x.k.length>0};
 const stpMk=(p,s,i)=>p.tr[s].p[i]||(p.tr[s].p[i]={k:[]});
-function addK(p,s,i,k,g){const x=stpMk(p,s,i);if(x.k.includes(k))return false;x.k.push(k);if(g!=null){(x.g||(x.g=[])).push(g);(x.nw||(x.nw=[])).push(1)}return true}
+function addK(p,s,i,k,g){if(g==null&&p._loop!=null)g=1;const x=stpMk(p,s,i);if(x.k.includes(k))return false;x.k.push(k);if(g!=null){(x.g||(x.g=[])).push(g);(x.nw||(x.nw=[])).push(1)}return true}
 function delK(p,s,i,k){const x=p.tr[s].p[i];if(!x)return false;const j=x.k.indexOf(k);if(j<0)return false;x.k.splice(j,1);if(x.g){x.g.splice(j,1);x.nw.splice(j,1)}if(!x.k.length)delete p.tr[s].p[i];return true}
 const delSt=(p,s,i)=>{delete p.tr[s].p[i]};
 const hasLk=x=>!!x&&(!!x.l||x.rat>1||!!x.mi||!!x.cd||!!x.tie||!!x.cm);
@@ -515,7 +515,7 @@ const chainSteps=ch=>ch.reduce((a,e)=>a+e.x,0);
 function chainTxt(ch){return ch.map(e=>{const c=S.cenas[e.c];return (c.p+1)+(c.l?'+F'+c.l.map((on,i)=>on?i+1:'').join(''):'')+(e.x>1?'×'+e.x:'')}).join('›')}
 function pruneCenas(){const used=new Set([...S.chain,...(pendingChain||[])].map(e=>e.c));if(used.size===S.cenas.length)return;
   const map={},nc=[];S.cenas.forEach((c,i)=>{if(used.has(i)){map[i]=nc.length;nc.push(c)}});S.cenas=nc;
-  for(const e of S.chain)e.c=map[e.c];if(pendingChain)for(const e of pendingChain)e.c=map[e.c]}
+  for(const e of S.chain)e.c=map[e.c];if(pendingChain)for(const e of pendingChain)e.c=map[e.c];if(curCena!=null)curCena=map[curCena]??null}
 /* migração 1 → 2: cada parte é convertida se ainda estiver no formato antigo */
 function patV1(o){const p=newPattern();p.len=o.len;
   for(let t=0;t<16;t++){const T=p.tr[t],sc=o.sc&&o.sc[t];if(sc){T.c=sc.c;T.d=sc.d}T.m=!!(o.mute&&o.mute[t]);T.so=!!(o.solo&&o.solo[t]);
@@ -756,14 +756,14 @@ const FAB=[[0,'m',8,'Baixo'],[1,'m',0,'Lead'],[2,'m',25,'Sino',{rv:.2}],[3,'m',1
 const capz=n=>n.split(' ').map((w,i)=>w==='FM'||/\d/.test(w)?w:i?w.toLowerCase():w.charAt(0)+w.slice(1).toLowerCase()).join(' ');
 function synSlot(t,id,name,x){const sl=newSlot(name);sl.syn={t,id};if(t==='m'){const pr=SPRE[id];sl.params.a=synAtkN(pr.a);sl.params.rl=synRelN(pr.r)}if(x)Object.assign(sl.params,x);return sl}
 function factory(){
-  S=defaultState();samples=Array(16).fill(null);
+  S=defaultState();samples=Array(16).fill(null);curCena=null;
   for(const [i,t,id,n,x] of FAB)S.instr[i]=synSlot(t,id,n,x);
   bufC.fill(null);revC.fill(null);
   save(true);
 }
 /* fábrica antiga, só de amostras (base dos testes de áudio e da seção Amostra da biblioteca) */
 function factoryClassic(){
-  S=defaultState();
+  S=defaultState();curCena=null;
   samples=factorySamples();
   FNAMES.forEach((n,i)=>S.instr[i].name=samples[i]?n:'');
   bufC.fill(null);revC.fill(null);
@@ -804,7 +804,7 @@ async function exportBackup(){
 async function importBackup(file){
   try{const {st,sm}=parseBackup(await file.text());
     if(playing)stopPlay();if(recSlot>=0)stopSampling();
-    S=migrate(st);samples=sm;if(S.vis===undefined)S.vis=true;setVol();if(AU)mixApply(AU);undoSt=[];perfPend=[];
+    S=migrate(st);samples=sm;curCena=null;if(S.vis===undefined)S.vis=true;setVol();if(AU)mixApply(AU);undoSt=[];perfPend=[];
     bufC.fill(null);revC.fill(null);for(let i=0;i<16;i++)voices[i].length=0;
     page=0;heldFx=-1;pendingChain=null;chainBuild=[];copyArm=null;
     setVis(S.vis);await save(true);flash(`BACKUP IMPORTADO · ${sm.filter(Boolean).length} SONS`,2400)}
@@ -960,10 +960,10 @@ function click(t,acc){if(!ctx||RC)return;const o=ctx.createOscillator(),g=ctx.cr
   o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.05);o.onended=()=>{try{g.disconnect()}catch(e){}}}
 const perfLive=()=>S.loops.some(t=>t.st==='rec'||t.st==='ovd')||perfPend.some(p=>p.a==='rec'||p.a==='ovd');
 const metOn=()=>S.met===2||(S.met===1&&(liveRecOn||perfLive()));
-function startPlay(count){ensureCtx();playing=true;stepIdx=0;chainPos=0;chainRep=0;gStep=0;cycN.fill(0);trOff.fill(0);lastSemi.fill(null);progNow=null;
+function startPlay(count){ensureCtx();playing=true;stepIdx=0;chainPos=0;chainRep=0;gStep=0;cycN.fill(0);trOff.fill(0);lastSemi.fill(null);progNow=null;loopPc.fill(0);
   if(pendingChain){S.chain=pendingChain;pendingChain=null;pruneCenas()}
   if(!chainHas(S.chain,S.curPattern)){S.chain=chainOf([S.curPattern]);pruneCenas()}
-  chainPos=Math.max(0,chainIdx(S.chain,S.curPattern));enterCena();
+  {const ci=curCena!=null?S.chain.findIndex(e=>e.c===curCena):-1;chainPos=ci>=0?ci:Math.max(0,chainIdx(S.chain,S.curPattern))}enterCena();
   nextTime=ctx.currentTime+.06;sched=[];loopSt=null;retr=null;
   countLeft=count?16:0;countEnd=nextTime+countLeft*stepDur();
   S.loops.forEach(t=>{t.t0=0;if(t.st==='ovd')t.st='play'});
@@ -1022,20 +1022,33 @@ function advance(){nextTime+=stepDur();stepIdx++;gStep++;
     else if(++chainRep>=S.chain[chainPos].x){chainRep=0;chainPos=(chainPos+1)%S.chain.length}
     enterCena()}}
 /* entrar numa cena: toca o padrão dela e, se a cena guarda loops, liga só esses loops */
-function enterCena(){const c=S.cenas[S.chain[chainPos].c];playPat=c.p;S.curPattern=playPat;
-  if(c.l&&!RC)S.loops.forEach((t,i)=>{if(t.len)t.mute=!c.l[i]})}
+/* cena com cópia das faixas (lp): ao entrar, as faixas da cena anterior ficam guardadas nela e as desta voltam.
+   Cena antiga (só l): liga e desliga os loops, como antes. */
+let curCena=null;
+const snapLoops=()=>S.loops.map(t=>({len:t.len,ps:t.tr.map(x=>cloneJ(x.p)),mute:t.mute,inst:t.inst,fx:{...t.fx},layers:t.layers,fb:t.fb}));
+function loadLoops(lp,g){S.loops.forEach((t,i)=>{const x=lp[i];if(!x)return;
+    Object.assign(t,{len:x.len,mute:!!x.mute,inst:x.inst??t.inst,fx:{...newTfx(),...(x.fx||{})},layers:x.layers||1,fb:x.fb??t.fb,st:x.len?'play':'empty',t0:g,undo:[],redo:[],pass:null,touched:false});
+    t.tr.forEach((y,s)=>y.p=cloneJ((x.ps&&x.ps[s])||{}));if(AU)tbApply(AU,i)});
+  perfPend=[];loopPc.fill(0)}
+function enterCena(){const ci=S.chain[chainPos].c,c=S.cenas[ci];playPat=c.p;S.curPattern=playPat;
+  if(RC)return;
+  if(c.lp){if(curCena!==ci){S.loops.forEach(t=>{if(t.st==='rec'){closeTrack(t,gStep);t.st=t.len?'play':'empty'}else if(t.st==='ovd'){endPass(t);t.st='play'}});
+      if(curCena!=null&&S.cenas[curCena]&&S.cenas[curCena].lp)S.cenas[curCena].lp=snapLoops();loadLoops(c.lp,gStep);curCena=ci;
+      if(S.loops[perfSel])S.curSound=mode==='perf'?S.loops[perfSel].inst:S.curSound;dirty()}}
+  else if(c.l)S.loops.forEach((t,i)=>{if(t.len)t.mute=!c.l[i]})}
 /* render offline: roda o mesmo agendador num OfflineAudioContext, sem tocar no estado ao vivo */
 async function renderOffline({steps=32,rate=44100,dry=false,bare=false,pat=null,tail=1.5}={}){
   const OC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
   const t0=.05,len=t0+steps*stepDur()+tail,oc=new OC(1,Math.ceil(len*rate),rate);
   const chain=dry?null:buildMaster(oc,{bare}),out=dry?oc.destination:chain.inp;
+  const keepPc=loopPc.slice();loopPc.fill(0);
   const keep={playing,nextTime,stepIdx,chainPos,chainRep,playPat,gStep,sched,loopSt,retr,countLeft,liveRecOn,pendingChain,progNow,arpK,cur:S.curPattern,cyc:cycN.slice(),off:trOff.slice(),ls:lastSemi.slice()};
   RC={ac:oc,dest:out,dry,chain,voices:Array.from({length:16},()=>[]),ev:[],steps:[]};
   try{if(pat!=null){S.curPattern=pat;}
     stepIdx=0;gStep=0;chainRep=0;const inCh=chainHas(S.chain,S.curPattern);chainPos=inCh?chainIdx(S.chain,S.curPattern):0;playPat=inCh?cenaP(S.chain[chainPos]):S.curPattern;
     nextTime=t0;sched=[];loopSt=null;retr=null;countLeft=0;liveRecOn=false;pendingChain=null;cycN.fill(0);trOff.fill(0);lastSemi.fill(null);progNow=null;arpK=null;
     for(let i=0;i<steps;i++){scheduleStep();RC.steps.push(sched[sched.length-1]);advance()}}
-  finally{const ev=RC.ev,st=RC.steps;RC=null;
+  finally{const ev=RC.ev,st=RC.steps;RC=null;loopPc.splice(0,4,...keepPc);
     ({playing,nextTime,stepIdx,chainPos,chainRep,playPat,gStep,sched,loopSt,retr,countLeft,liveRecOn,pendingChain,progNow,arpK}=keep);S.curPattern=keep.cur;cycN=keep.cyc;trOff.splice(0,16,...keep.off);lastSemi.splice(0,16,...keep.ls);
     var res={ev,steps:st,t0}}
   res.buf=await new Promise((ok,no)=>{oc.oncomplete=e=>ok(e.renderedBuffer);const p=oc.startRendering();if(p&&p.then)p.then(ok,no)});
@@ -1096,7 +1109,12 @@ function arpFree(){if(!arpK||playing){arpTm=null;return}const F=AVEL[S.arp.v][1]
   if(arpK.nt==null){arpK.nt=ctx.currentTime+.01;arpK.i0=0;arpK.ix=0}
   while(arpK.nt<ctx.currentTime+.1){arpFire(arpK.ix,arpK.nt,d*.9,null);arpK.ix++;arpK.nt+=d}
   arpTm=setTimeout(arpFree,20)}
-const ep=()=>S.patterns[playing&&visCur?visCur.pat:S.curPattern];
+/* Passos editam o padrão ou, vindo do Perf, uma faixa (editLoop): a faixa vira um "padrão" de len×16 passos,
+   com tom e escala do padrão atual (as trilhas são as mesmas: o que o REC grava é o que os Passos mostram) */
+let editLoop=-1;
+const loopView=i=>{const t=S.loops[i],P=S.patterns[playing&&visCur?visCur.pat:S.curPattern];return {len:Math.max(1,t.len)*16,key:P.key,sc:P.sc,tr:t.tr,fx:{fx:true,m:false,p:{}},_loop:i}};
+const loopPos=i=>{const t=S.loops[i];if(!playing||!visCur||!t.len||t.st==='rec')return -1;const L=t.len*16;return ((visCur.g-t.t0)%L+L)%L};
+const ep=()=>editLoop>=0?loopView(editLoop):S.patterns[playing&&visCur?visCur.pat:S.curPattern];
 const epIdx=()=>playing&&visCur?visCur.pat:S.curPattern;
 /* polimetria: cada som tem comprimento (c, 0 = o do padrão) e divisão própria. O passo local é
    floor(posição no padrão × fator) mod c, contado sempre do início do padrão, então nada sai de fase. */
@@ -1111,7 +1129,7 @@ const locAt=(p,s,pos)=>(Math.floor(pos*DIVF[p.tr[s].d]+1e-9)+(p.tr[s].d===1?trOf
 const locNear=(p,s,base,fr=0)=>{const c=sComp(p,s),f=DIVF[p.tr[s].d];return f===1?base%c:((Math.round((base+fr)*f)%c)+c)%c};   // passo local mais próximo (gravação): base = passo do padrão mais próximo, fr = desvio em passos
 const vlen=p=>Math.max(p.len,...p.tr.map(x=>x.c||0));
 const npages=p=>Math.max(1,Math.ceil(vlen(p)/16));
-function viewPage(){const p=ep(),n=npages(p);if(S.follow&&playing&&visCur&&visCur.pat===epIdx())return Math.min(n-1,(locAt(p,S.curSound,visCur.real)/16)|0);return Math.min(S.page,n-1)}
+function viewPage(){const p=ep(),n=npages(p);if(editLoop>=0){const lp=loopPos(editLoop);return S.follow&&lp>=0?Math.min(n-1,(lp/16)|0):Math.min(S.page,n-1)}if(S.follow&&playing&&visCur&&visCur.pat===epIdx())return Math.min(n-1,(locAt(p,S.curSound,visCur.real)/16)|0);return Math.min(S.page,n-1)}
 
 /* --- desfazer por volta (gravação ao vivo) --- */
 function snapPat(pi){const p=S.patterns[pi];return {pi,ps:p.tr.map(t=>cloneJ(t.p))}}
@@ -1156,10 +1174,22 @@ function perfStep(t,g){const P=S.perf;
     if(tr.st==='empty')continue;
     if(tr.st==='rec'){if(g-tr.t0>=128){closeTrack(tr,g);if(tr.len){tr.st='ovd';tr.pass=trSnap(tr);tr.touched=false;flash('8 COMPASSOS · FAIXA FECHADA')}}continue}
     const L=tr.len*16,pos=((g-tr.t0)%L+L)%L;
+    if(pos===0&&g>tr.t0)loopPc[ti]++;
     if(pos===0&&tr.st==='ovd')trWrap(tr);
     if(tr.mute)continue;
-    for(let s=0;s<16;s++){const T=tr.tr[s],x=T.p[pos];if(x){const gate=s<8?stepGate(T,pos,x,stepDur(),L):0,tb=s===tr.inst?ti:null;x.k.forEach((k,j)=>trigger(s,k,t,{gain:x.g[j],fx:heldFx>=4?heldFx:-1,gate,tb}))}}
+    for(let s=0;s<16;s++){const x=tr.tr[s].p[pos];if(x&&x.k.length)loopFire(tr,ti,s,x,t,pos,L)}
   }}
+/* passo de faixa PERF: o mesmo passo rico dos padrões (os Passos editam a faixa): ratchet, micro, condição pela volta
+   da faixa, tie, trava e QUEBRA/RAMPA; ganho por nota do overdub com feedback */
+const loopPc=[0,0,0,0];
+function loopFire(tr,ti,s,x,t,pos,L){const dur=stepDur();
+  if(x.cd){const c=loopPc[ti];if(!(x.cd===1?c%2===0:x.cd===2?c%2===1:x.cd===3?c%4===0:x.cd===4?Math.random()<.5:x.cd===5?fillOn:x.cd===6?!fillOn:true))return}
+  if(x.tie&&s<8)return;
+  let tt=t;if(x.mi)tt+=x.mi<0?Math.max(x.mi*dur,-MICRO_MAX):x.mi*dur;
+  const rat=x.rat>1?x.rat:1,ww=dur/rat,lock=x.l||null,tb=s===tr.inst?ti:null,fx=heldFx>=4?heldFx:-1,cm=s<8?x.cm:null,gn=j=>(x.g&&x.g[j]!=null?x.g[j]:1);
+  if(cm&&(cm.t==='q'||cm.t==='ru'||cm.t==='rd')){cmSeq(S.patterns[playPat],x.k,cm).forEach((k,i)=>trigger(s,k,tt+i*dur,{lock,fx,gain:gn(0),maxDur:dur*.95,tb}));return}
+  const gate=s<8?(rat>1?ww*.9:stepGate(tr.tr[s],pos,x,dur,L)):0;
+  x.k.forEach((k,j)=>{for(let r=0;r<rat;r++)trigger(s,k,tt+r*ww,{lock,fx,gain:gn(j)*(rat>1?Math.pow(.9,r):1),gate,tb})})}
 function recTrack(s){const T=S.loops,a=T[perfSel],live=t=>(t.st==='rec'||t.st==='ovd')&&t.inst===s;if(live(a))return a;return T.find(live)}
 function perfAdd(s,k,g){const t=recTrack(s);if(!t)return;let pos;
   if(t.st==='rec'){pos=g-t.t0;if(pos<0){if(pos>=-1)pos=0;else return}if(pos>=128)return}
@@ -1245,7 +1275,9 @@ function applyChain(b){const ch=chainOf(b);
   if(playing){pendingChain=ch;flash(txt+'\nentra no próximo ciclo')}else{S.chain=ch;S.curPattern=b[0];pruneCenas();flash(txt)}dirty()}
 /* PERF › +cena: guarda o padrão atual com os loops que estão tocando e põe no fim da cadeia */
 function addCena(){const l=S.loops.map(t=>!!t.len&&!t.mute);if(!l.some(Boolean)){flash('GRAVE UM LOOP ANTES');return}
-  const pi=epIdx(),c=cenaFor(pi,l),ch=pendingChain||S.chain;
+  // COMMIT: guarda uma cópia das 4 faixas numa cena nova no fim da cadeia; as mudanças daqui em diante vão para ela
+  // (a cena de antes fica como estava; quando a cadeia sai de uma cena tocando, o que mudou nela fica guardado nela)
+  const pi=epIdx(),ch=pendingChain||S.chain;S.cenas.push({p:pi,l,lp:snapLoops()});const c=S.cenas.length-1;curCena=c;
   if(ch.length===1&&ch[0].x===1&&!S.cenas[ch[0].c].l&&cenaP(ch[0])===pi)ch[0].c=c;
   else{const last=ch[ch.length-1];if(last.c===c)last.x++;else ch.push({c,x:1})}
   pruneCenas();dirty();flash(`CENA ${pad(pi+1)} + ${l.map((o,i)=>o?'F'+(i+1):'').filter(Boolean).join(' ')}\nCADEIA ${chainTxt(ch)}`,2400)}
@@ -1492,7 +1524,7 @@ function fmt(key,v){
   if(key==='f')return v<.47?`LP ${Math.round((1-v/.47)*100)}`:v>.53?`HP ${Math.round((v-.53)/.47*100)}`:'aberto';
   return `${Math.round(v*100)}`}
 
-function setMode(m){const prev=mode;mode=m;kbRelease();if(m!=='sound'){chopExit();texV=false}polyEd=false;stepEd=false;selStep=-1;if(prev==='sound'&&m!=='sound'&&micOn){micOn=false;closeMic()}copyArm=null;chainOn=false;if(m!=='fx'&&!fxLatch)heldFx=-1;if(m!=='play')eraseOn=false;if(m==='perf')perfPick(perfSel);$('app').dataset.mode=m}
+function setMode(m){const prev=mode;mode=m;kbRelease();if(m!=='sound'){chopExit();texV=false}polyEd=false;stepEd=false;selStep=-1;if(prev==='sound'&&m!=='sound'&&micOn){micOn=false;closeMic()}copyArm=null;chainOn=false;if(m!=='fx'&&!fxLatch)heldFx=-1;if(m!=='play')eraseOn=false;if(m==='perf')perfPick(perfSel);if(m!=='steps')editLoop=-1;$('app').dataset.mode=m}
 function setVis(on){S.vis=on;$('gl').style.visibility=on?'visible':'hidden';if(on)glInit();dirty()}
 
 /* --- pads --- */
@@ -1768,6 +1800,10 @@ function act(a){ensureCtx();const cs=S.curSound,sl=S.instr[cs];
       trPush(tr);tr.len/=2;truncTr(tr,tr.len*16);if(tr.st==='ovd'){tr.pass=trSnap(tr);tr.touched=false}flash(`F${perfSel+1} · ${tr.len} COMP`);dirty();break;
     case 'pClr':if(needConf(a))break;perfPend=perfPend.filter(p=>p.i!==perfSel);Object.assign(tr,newTrack(),keepT(tr),{mute:false});flash(`F${perfSel+1} LIMPA`);dirty();break;
     case 'pSave':perfSave();break;
+    case 'pSteps':{if(tr.st==='rec'){flash('FECHE A GRAVAÇÃO DA FAIXA ANTES');break}if(!tr.len){tr.len=1;tr.st='play';tr.t0=playing&&visCur?visCur.g-(visCur.g%16):0;tr.layers=1}
+      const i=perfSel;setMode('steps');editLoop=i;S.curSound=tr.inst;S.layView=false;S.page=0;stepEd=false;flash(`PASSOS DA F${i+1} · ${(S.instr[tr.inst].name||'').toUpperCase()}`);break}
+    case 'lvx':editLoop=-1;S.page=0;flash(`PASSOS DO PADRÃO ${pad(epIdx()+1)}`);break;
+    case 'lcomp':{const t=S.loops[editLoop];trPush(t);if(t.len<8){dupTr(t,t.len*16);t.len*=2}else{t.len=1;truncTr(t,16)}if(t.st==='ovd'){t.pass=trSnap(t);t.touched=false}S.page=0;flash(`F${editLoop+1} · ${t.len} COMP`);dirty();break}
     case 'pCena':addCena();break;
   }}
 function ctxHTML(){const cs=S.curSound,sl=S.instr[cs],p=ep();
@@ -1777,12 +1813,13 @@ function ctxHTML(){const cs=S.curSound,sl=S.instr[cs],p=ep();
     case 'play':{const n=undoSt.length+(passTouched?1:0);
       return B('rec',liveRecOn?'● rec':'○ rec',liveRecOn?'rec on':'')+B('rept',S.rept?`rept ${RL[S.rept]}`:'rept',S.rept?'on':'')+B('erase','borracha',eraseOn?'on':'')+B('undo',`desfazer${n?' '+n:''}`)}
     case 'steps':{const np=npages(p),lim=B('clrSnd',conf('clrSnd','limpar'));
-      if(S.layView&&polyEd)return B('pc-','−','sm')+T(`comp ${sComp(p,cs)}`)+B('pc+','+','sm')+B('pd-','‹','sm')+T(DIVL[p.tr[cs].d])+B('pd+','›','sm')+B('polyEd','ok','on');
+      if(S.layView&&polyEd&&editLoop<0)return B('pc-','−','sm')+T(`comp ${sComp(p,cs)}`)+B('pc+','+','sm')+B('pd-','‹','sm')+T(DIVL[p.tr[cs].d])+B('pd+','›','sm')+B('polyEd','ok','on');
       if(S.layView)return B('layView','todos','on')+comp+(np>1?fol:'')+lim;
       if(stepEd){const l=richGet(),ok=selStep>=0&&hasN(p,cs,selStep);
         if(!ok)return T('toque num passo')+B('stepEd','ok','on');
         if(cs<8)return B('rat',`rat ${l.rat||1}`,l.rat>1?'on':'')+B('mi-','−','sm')+`<span class="hint n">${l.mi>0?'+':''}${Math.round((l.mi||0)*100)}</span>`+B('mi+','+','sm')+B('cond',l.cd?CONDL[l.cd]:'cond',l.cd?'on':'')+B('tie','tie',l.tie?'on':'')+B('cm',l.cm?cmTxt(l.cm).toLowerCase():'comp',l.cm?'on':'')+B('stepEd','ok','on')
         return B('rat',`rat ${l.rat||1}`,l.rat>1?'on':'')+B('mi-','−','sm')+T(`mic ${l.mi>0?'+':''}${Math.round((l.mi||0)*100)}`)+B('mi+','+','sm')+B('cond',CONDL[l.cd||0],l.cd?'on':'')+B('stepEd','ok','on')}
+      if(editLoop>=0)return B('note-','−','sm')+`<span class="hint n">${cs<8?chName(curNs(cs)):'F'+(sl.lastKey+1)}</span>`+B('note+','+','sm')+B('lvx',`F${editLoop+1} ✕`,'on')+B('stepEd','passo')+B('lcomp',`${S.loops[editLoop].len||1} comp`)+(np>1?fol:'')+lim;
       return B('note-','−','sm')+`<span class="hint n">${cs<8?chName(curNs(cs)):'F'+(sl.lastKey+1)}</span>`+B('note+','+','sm')+B('layView','todos')+B('stepEd','passo')+(np>1?B('comp',`${p.len} pas`)+fol:comp)+lim}
     case 'sound':{if(micOn){const t=micState==='ready'?'segure um pad':micState==='asking'?'aceite o mic':micState==='denied'?'mic negado · arquivo':micState==='blocked'?'sem mic · arquivo':'abrindo mic…';return T(t)+B('micRec','sair do mic','on')+B('del',conf('del','apagar'))}
       if(texV)return B('texPlay',texN?'■ parar':'▶ tocar',texN?'on':'')+B('texFrz','freeze',S.tex.frz?'on':'')+T(S.tex.s>=0?`som ${pad(S.tex.s+1)}`:'escolha um pad')+B('tex','ok','on');
@@ -1791,7 +1828,7 @@ function ctxHTML(){const cs=S.curSound,sl=S.instr[cs],p=ep();
     case 'pattern':if(chainOn)return T(chainBuild.length?listTxt(chainBuild):'toque em ordem')+B('chUndo','desfazer')+B('chNew','nova')+B('chainM','pronto','on');
       return B('copyP',copyArm==='pattern'?'toque o destino':'copiar para…',copyArm==='pattern'?'on':'')+B('chainM','montar cadeia')+comp+B('clrPat',conf('clrPat','limpar'));
     case 'fx':return B('fxHold','segurar',fxLatch?'':'on')+B('fxLatch','travar',fxLatch?'on':'')+B('fxRec','gravar',fxRec?'on':'')+B('fxClr',conf('fxClr','apagar'));
-    case 'perf':{const t=S.loops[perfSel];return B('pUndo','desf')+(t.redo.length?B('pRedo','refaz'):'')+B('pComp',`comp ${t.len?t.len+'c':'—'}`)+B('pClr',conf('pClr','limpar'))+B('pSave','salvar')+B('pCena','+cena')}
+    case 'perf':{const t=S.loops[perfSel];return B('pUndo','desf')+(t.redo.length?B('pRedo','refaz'):'')+B('pComp',`comp ${t.len?t.len+'c':'—'}`)+B('pSteps','passos')+B('pClr',conf('pClr','limpar'))+B('pSave','salvar')+B('pCena','+cena')}
   }return ''}
 function menuSync(){$('mVol').textContent=S.vol;$('mVis').textContent=`Visual de ferrofluido: ${S.vis?'ligado':'desligado'}`;$('mCount').textContent=`Contagem antes do REC: ${S.countIn?'ligada (1 compasso)':'desligada'}`;$('mMv').textContent=S.metVol;{const d=S.mix.dk;$('mDk').textContent=`Gatilho do DUCK: som ${pad(d.s+1)} · ${d.s<8?noteName(d.k):'fatia '+(d.k+1)} (toque para usar o som e a nota atuais)`;$('mFd').textContent=DEV.fade+' ms'}
   $('mCal').textContent=`Calibrar latência do REC (ajuste ${DEV.latAdj>0?'+':''}${DEV.latAdj||0} ms)`}
@@ -1933,11 +1970,11 @@ function renderKbd(p,cs,sl){
     setTxt(el.querySelector('.d'),nota?ROMAN[b]:ev.roman);setTxt(el.querySelector('.c'),ev.name);
     setCls(el,'kkey'+(kbDownEl[b]?' down':'')+(mode==='steps'&&lc&&lc.length===ev.notes.length&&lc.every((n,i)=>n===ev.notes[i])?' cur':''))})}
 function render(){
-  const pi=epIdx(),pat=S.patterns[pi],cs=S.curSound,sl=S.instr[cs],now=performance.now(),actx=ctx?ctx.currentTime:0;
-  const vs=playing&&visCur?visCur.real:-1,L=pat.len,vp=viewPage(),np=npages(pat),CL=sComp(pat,cs),lv=vs>=0?locAt(pat,cs,vs):-1;
+  const pi=epIdx(),pat=editLoop>=0?ep():S.patterns[pi],cs=S.curSound,sl=S.instr[cs],now=performance.now(),actx=ctx?ctx.currentTime:0;
+  const vs=editLoop>=0?loopPos(editLoop):playing&&visCur?visCur.real:-1,L=pat.len,vp=viewPage(),np=npages(pat),CL=sComp(pat,cs),lv=vs>=0?locAt(pat,cs,vs):-1;
   const afx=heldFx>=0?heldFx:(playing&&visCur?fxAt(pat,visCur.real):-1);curFx=afx;
   const counting=playing&&ctx&&actx<countEnd-.005;
-  setTxt($('dSnd'),`SOM ${pad(cs+1)}`);setTxt($('dPat'),`PADRÃO ${pad(pi+1)}·${L}`);setTxt($('dBpm'),`${S.bpm} BPM`);setTxt($('dMem'),`MEM ${(MEM-usedMem()).toFixed(0)}S`);
+  setTxt($('dSnd'),`SOM ${pad(cs+1)}`);setTxt($('dPat'),editLoop>=0?`FAIXA F${editLoop+1}·${L}`:`PADRÃO ${pad(pi+1)}·${L}`);setTxt($('dBpm'),`${S.bpm} BPM`);setTxt($('dMem'),`MEM ${(MEM-usedMem()).toFixed(0)}S`);
   let big=(sl.name||'vazio').toUpperCase(),hot=false;
   if(calib){big=`CALIBRAR ${calib.taps.length}/8`;hot=true}
   else if(freeCap&&ctx){big=`LIVRE ● ${(actx-freeCap.t0).toFixed(1)}S`;hot=true}
