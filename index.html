@@ -491,7 +491,8 @@ const newPattern=()=>({len:16,key:0,sc:0,tr:Array.from({length:16},newTrilha),fx
 const DEF_INST=[8,0,7,1],newTfx=()=>({v:.8,p:.5,f:.5,d:0,r:0,e:0});
 const newTrack=(i=0)=>({len:0,tr:Array.from({length:16},newTrilha),st:'empty',mute:false,fb:100,layers:0,t0:0,undo:[],redo:[],pass:null,touched:false,inst:DEF_INST[i]??8,fx:newTfx()});
 const newLoops=()=>[0,1,2,3].map(newTrack);
-const keepT=t=>({fb:t.fb,mute:t.mute,inst:t.inst,fx:t.fx});   // limpar/regravar uma faixa mantém o som e o mix dela
+const keepT=t=>({fb:t.fb,mute:t.mute,inst:t.inst,fx:t.fx});
+function fixInst(){S.loops.forEach(t=>{if(hasSnd(t.inst)||t.tr.some(trUsed))return;const f=(t.inst>=8?[8,9,10,11,12,13,14,15]:[0,1,2,3,4,5,6,7]).find(hasSnd);if(f!=null)t.inst=f})}   // limpar/regravar uma faixa mantém o som e o mix dela
 /* som mais usado numa faixa antiga (migração) */
 function mostUsed(t){let b=-1,bn=0;t.tr.forEach((x,s)=>{let n=0;for(const i in x.p)n+=x.p[i].k.length;if(n>bn){bn=n;b=s}});return b<0?null:b}
 const newPerf=()=>({q:'comp',free:false});
@@ -817,7 +818,7 @@ async function exportBackup(){
 async function importBackup(file){
   try{const {st,sm}=parseBackup(await file.text());
     if(playing)stopPlay();if(recSlot>=0)stopSampling();
-    S=migrate(st);samples=sm;curCena=null;if(S.vis===undefined)S.vis=true;setVol();if(AU)mixApply(AU);undoSt=[];perfPend=[];
+    S=migrate(st);samples=sm;fixInst();curCena=null;if(S.vis===undefined)S.vis=true;setVol();if(AU)mixApply(AU);undoSt=[];perfPend=[];
     bufC.fill(null);revC.fill(null);for(let i=0;i<16;i++)voices[i].length=0;
     page=0;heldFx=-1;pendingChain=null;chainBuild=[];copyArm=null;
     setVis(S.vis);await save(true);flash(`BACKUP IMPORTADO · ${sm.filter(Boolean).length} SONS`,2400)}
@@ -1564,7 +1565,7 @@ function padDown(k){ensureCtx();const cs=S.curSound,sl=S.instr[cs];
     case 'play':sl.lastKey=k;pressT[k]=ctx.currentTime;if(eraseOn&&liveRecOn&&playing)break;padH[k]=liveRecOn&&playing?liveRec(k):{vc:playNow(cs,k),t0:ctx.currentTime};break;
     case 'perf':{sl.lastKey=k;pressT[k]=ctx.currentTime;const h={vc:playNow(cs,k,perfO(cs)),t0:ctx.currentTime};padH[k]=h;if(freeCap){freeCap.ev.push([cs,k,touchT(ctx.currentTime)]);break}const b=playing?nearest():null;if(b)h.loc=perfAdd(cs,k,b.g,(touchT(ctx.currentTime)-b.time)/stepDur());break}
     case 'steps':{if(S.layView)break;const st=viewPage()*16+k;if(st<sComp(ep(),S.curSound))stepEd?stepPick(st):toggleStep(st);break}
-    case 'sound':if(texV){if(!samples[k]){flash('SOM VAZIO');break}const was=!!texN;if(was)texPlay();S.tex.s=k;S.tex.frz=false;dirty();if(was)texPlay();break}
+    case 'sound':if(texV){if(!samples[k]){flash(S.instr[k].syn?'TEXTURA SÓ COM AMOSTRA':'SOM VAZIO');break}const was=!!texN;if(was)texPlay();S.tex.s=k;S.tex.frz=false;dirty();if(was)texPlay();break}
       if(chopOn){if(chopTap){chopTapBtn();break}const m=chopMarks();if(k<m.length){chopSel=k;const [a,b]=chopRegion(k);playRegion(cs,a,b)}break}
       if(micOn){startSampling(k);break}if(copyArm==='sound'){copySound(cs,k);copyArm=null}else{S.curSound=k;flash(`SOM ${pad(k+1)} ${S.instr[k].name||'VAZIO'}`);if(hasSnd(k))padH[k]={vc:playNow(k,S.instr[k].lastKey),t0:ctx.currentTime}}dirty();break;
     case 'pattern':if(chainOn){if(chainBuild.length<128){chainBuild.push(k);applyChain(chainBuild.slice())}break}if(copyArm==='pattern'){copyPattern(k);copyArm=null}else applyChain([k]);break;
@@ -1633,7 +1634,7 @@ function detectAttacks(d,rate,sens=.5){const W=Math.round(rate*.01),H=Math.round
       let k=a;while(k<b&&Math.abs(d[k])<pk*.1)k++;out.push(k);last=i}}
   const fr=out.map(k=>k/d.length);if(!fr.length||fr[0]>.01)fr.unshift(0);return fr.slice(0,16)}
 const chopMarks=()=>S.instr[S.curSound].marks||(S.instr[S.curSound].marks=[0]);
-function chopStart(){texV=false;const cs=S.curSound;if(!samples[cs]){flash('GRAVE OU CARREGUE UM SOM ANTES');return}
+function chopStart(){texV=false;const cs=S.curSound;if(!samples[cs]){flash(S.instr[cs].syn?'CHOP SÓ COM AMOSTRA\ngrave ou carregue um som':'GRAVE OU CARREGUE UM SOM ANTES');return}
   const sl=S.instr[cs];if(!Array.isArray(sl.marks)||!sl.marks.length)sl.marks=cs>=8?[...new Set(sl.slices.map(x=>Math.round(x.st*1e4)/1e4))].sort((a,b)=>a-b):[0];
   chopOn=true;micOn=false;closeMic();copyArm=null;chopSel=-1;wavePk=null;$('disp').classList.add('chop');flash('CHOP · TAP, ATAQUES OU GRADE')}
 function chopExit(){if(!chopOn)return;chopStopTap();chopOn=false;$('disp').classList.remove('chop')}
@@ -2086,7 +2087,7 @@ function frame(){requestAnimationFrame(frame);if(!S)return;micTick();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   let ok=false;
   if(!TEST)try{const dv=await idb.get('aparelho');if(dv){DEV=Object.assign(DEVDEF(),dv);devLoaded=true}}catch(e){}
-  if(!TEST)try{const st=await idb.get('state'),sm=await idb.get('samples');if(st&&st.v>=1&&st.v<=VER&&Array.isArray(sm)&&st.patterns&&st.patterns.length===16){S=migrate(st);samples=sm;ok=true}}catch(e){}
+  if(!TEST)try{const st=await idb.get('state'),sm=await idb.get('samples');if(st&&st.v>=1&&st.v<=VER&&Array.isArray(sm)&&st.patterns&&st.patterns.length===16){S=migrate(st);samples=sm;fixInst();ok=true}}catch(e){}
   if(!ok)factory();
   if(S.vis===undefined)S.vis=true;
   setVis(S.vis);
