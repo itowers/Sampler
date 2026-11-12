@@ -327,7 +327,7 @@ T['11.8 arp']=async()=>{const N='11.8 arp',bad=[];
   rec(N,!bad.length,bad.length?bad.join(' · '):`↑ alcance 2 = ${seq} · ↑↓ e manual certos · 1/16 = uma por passo · 1/16T = 12 notas em 8 passos`)};
 T['11.9 superfície por tipo de som']=async()=>{const N='11.9 superfície por tipo de som',bad=[];
   reset();const kb=(s,m,extra='')=>E(`S.curSound=${s};setMode('${m}');${extra}render();document.getElementById('app').dataset.kb`);
-  const a=kb(2,'play'),b=kb(11,'play'),c=kb(2,'steps','S.layView=false;'),d=kb(2,'perf'),e=kb(13,'steps'),f=kb(2,'steps','S.layView=true;');
+  const a=kb(2,'play'),b=kb(11,'play'),c=kb(2,'steps','S.layView=false;');E('S.loops[perfSel].inst=2');const d=kb(2,'perf'),e=kb(13,'steps'),f=kb(2,'steps','S.layView=true;');
   if(a!=='full')bad.push('som 3 tocar: '+a);if(b!=='')bad.push('som 12 tocar: '+b);if(c!=='strip')bad.push('som 3 passos: '+c);if(d!=='perf')bad.push('som 3 perf: '+d);if(e!=='')bad.push('som 14 passos: '+e);if(f!=='')bad.push('camadas: '+f);
   E(`S.layView=false;setMode('play')`);
   // amostra importada num som de melodia: teclado afinado (G = +7 semitons sobre a amostra)
@@ -372,6 +372,28 @@ T['12.3 biblioteca e migração do synth']=async()=>{const N='12.3 biblioteca e 
   if(JSON.stringify(x)!=='[0,null,2,0.35]')bad.push('migração '+JSON.stringify(x));
   const cp=E(`(()=>{const k=S.instr[12].syn;copySound(12,2);return S.instr[2].syn})()`);if(cp)bad.push('kit copiado para melodia');
   rec(N,!bad.length,bad.length?bad.join(' · '):'preset e kit entram sem amostra · amostra antiga volta da biblioteca · projeto antigo ganha rv/ec/eco e descarta synth inválido · kit não vai para som de melodia')};
+/* ---------- Perf: faixa = instrumento e mix por faixa ---------- */
+T['13.1 Perf: faixa = instrumento']=async()=>{const N='13.1 Perf: faixa = instrumento',bad=[];
+  reset();E(`S.loops=newLoops();perfSel=0;setMode('perf')`);
+  const a=E(`[S.loops.map(t=>t.inst).join(),S.curSound,(perfPick(1),S.curSound),(perfPick(0),S.curSound)]`);if(JSON.stringify(a)!=='["8,0,7,1",8,0,8]')bad.push('escolher faixa '+JSON.stringify(a));
+  const r=E(`(()=>{const t=S.loops[1];Object.assign(t,{st:'ovd',len:1,t0:0});perfPick(1);const x=perfAdd(0,5,3),y=perfAdd(8,2,3);return [!!x,y===null||y===undefined,t.tr[0].p[3]&&t.tr[0].p[3].k.join()]})()`);
+  if(!(r[0]&&r[1]&&r[2]==='5'))bad.push('gravação '+JSON.stringify(r));
+  const m=E(`(()=>{const t=S.loops[1];addK(t,0,7,9,1);setInst(1,3);return [t.inst,Object.keys(t.tr[0].p).length,Object.keys(t.tr[3].p).join(),S.curSound]})()`);if(JSON.stringify(m)!=='[3,0,"3,7",3]')bad.push('trocar por melodia '+JSON.stringify(m));
+  const c=E(`(()=>{const t=S.loops[1],a=setInst(1,9),i1=t.inst,b=setInst(1,9);return [a,i1,b,t.inst,trUsed(t.tr[3])]})()`);if(JSON.stringify(c)!=='[false,3,true,9,false]')bad.push('melodia → batida '+JSON.stringify(c));
+  const g=E(`(()=>{const o=JSON.parse(JSON.stringify(S));o.loops[2]={len:1,st:'play',mute:false,fb:100,layers:1,t0:0,tr:Array.from({length:16},newTrilha)};o.loops[2].tr[5].p[0]={k:[0],g:[1],nw:[0]};const m=migrate(o);return [m.loops[2].inst,m.loops[2].fx.v]})()`);
+  if(JSON.stringify(g)!=='[5,0.8]')bad.push('migração '+JSON.stringify(g));
+  E(`setMode('play')`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):'F1–F4 nascem com 9, 1, 8 e 2 · escolher a faixa troca o som · só grava na faixa do som tocado · trocar por melodia leva as notas · melodia → batida pede confirmação e apaga · faixa antiga ganha o som mais usado')};
+T['13.2 Perf: mix da faixa']=async()=>{const N='13.2 Perf: mix da faixa',bad=[];
+  reset();useClicks(8);E(`S.patterns[0]=newPattern();S.loops=newLoops();const t=S.loops[0];Object.assign(t,{inst:8,st:'play',len:1,t0:0,layers:1});addK(t,8,0,0,1);addK(t,8,8,1,1);`);
+  const lv=async()=>{const r=await render({steps:16,bare:true});return [rmsAt(r.buf,r.t0,r.t0+.03),rmsAt(r.buf,r.t0+.05,r.t0+.5)]};
+  const base=await lv();E('S.loops[0].fx.v=.4');const low=await lv();E('S.loops[0].fx.v=.8;S.loops[0].fx.f=.1');const lp=await lv();E('S.loops[0].fx.f=.5;S.loops[0].fx.r=1');const rv=await lv();
+  const db=x=>20*Math.log10(Math.max(x,1e-9)),dv=db(low[0]/base[0]),df=db(lp[0]/base[0]);
+  if(Math.abs(dv+6.02)>.5)bad.push(`volume ${dv.toFixed(2)} dB`);if(!(df<-6))bad.push(`filtro ${df.toFixed(1)} dB`);if(!(rv[1]>base[1]*3+.002))bad.push(`reverb ${rv[1].toFixed(4)}`);
+  // nota de outro som dentro da faixa (projeto antigo) não passa pelo mix da faixa
+  E(`S.loops[0].fx={...newTfx(),v:0};addK(S.loops[0],9,0,0,1);samples[9]=samples[8];invalidate(9);S.instr[9]=newSlot('c2')`);const lg=await lv();if(!(lg[0]>base[0]*.5))bad.push('nota antiga sumiu');
+  rec(N,!bad.length,bad.length?bad.join(' · '):`volume ${dv.toFixed(1)} dB (de .8 para .4) · filtro LP ${df.toFixed(0)} dB · reverb da faixa deixa cauda · notas de outros sons seguem direto`)};
+PERSIST.push(['faixas do Perf',`Object.assign(S.loops[2],{inst:5,fx:{v:.5,p:.3,f:.2,d:.4,r:.6,e:.1}})`,`S.loops[2].inst===5&&S.loops[2].fx.d===.4&&S.loops[2].fx.e===.1&&S.loops[2].fx.p===.3`]);
 PERSIST.push(['synth e espaço',`S.instr[5]=synSlot('m',30,'vib',{rv:.4,ec:.2});S.instr[13]=synSlot('k',6,'tec');S.instr[13].kp={3:[.2,.8]};S.mix.ef=.5;S.mix.et=1;addK(S.patterns[2],5,4,7);TL(S.patterns[2],5,4,{du:2.5})`,
   `S.instr[5].syn.id===30&&S.instr[5].params.rv===.4&&S.instr[5].params.ec===.2&&S.instr[13].syn.t==='k'&&S.instr[13].kp[3][1]===.8&&S.mix.ef===.5&&S.mix.et===1&&S.patterns[2].tr[5].p[4].du===2.5`]);
 
