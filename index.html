@@ -68,7 +68,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
 #disp .xh{display:none;position:absolute;right:16px;bottom:14px;font:10px var(--px);color:var(--mut)}
 #disp.full .xh{display:block}
 /* linhas de controle */
-.tiles{display:grid;grid-template-columns:1.3fr 1fr 1.3fr;gap:var(--g)}
+.tiles{display:grid;grid-template-columns:1.3fr .85fr 1.3fr .85fr;gap:var(--g)}
 .tile{border-radius:clamp(10px,1.6dvh,16px);height:clamp(42px,6.4dvh,64px);display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:0 4px}
 .tile small{font-size:10px;letter-spacing:.14em;color:#55544f;font-weight:600;text-transform:uppercase;white-space:nowrap}
 .tile b{font-size:clamp(14px,2.2dvh,20px);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -282,6 +282,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
    <div class="tile"><small>BPM</small><div class="st"><button data-a="bpm-">−</button><b id="tBpm"></b><button data-a="bpm+">+</button></div></div>
    <button class="tile big" data-a="tap"><b>TAP</b></button>
    <div class="tile"><small>Swing</small><div class="st"><button data-a="sw-">−</button><b id="tSw"></b><button data-a="sw+">+</button></div></div>
+   <button class="tile" data-a="rq" aria-label="Quantização do REC"><small>Quant</small><b id="tRq"></b></button>
   </div>
   <div class="modes" id="modes"></div>
   <div class="ctx" id="ctx"></div>
@@ -310,6 +311,7 @@ button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:poin
  <tr><td>Tocar</td><td>sons 9–16 (batida e amostras) tocam nos 16 pads. Sons 1–8 (melodia) tocam no teclado de 7 acordes, no estilo do DuoSynth. ● REC parado = contagem de 1 compasso e começa gravando; tocando = liga/desliga a gravação sem parar a música. Cada volta soma notas (overdub)</td></tr>
  <tr><td>teclado</td><td>7 teclas = os 7 graus do tom (I ii iii IV V vi vii°). Estilo: Acorde · Strum (notas em sequência rápida) · Arp · Nota (uma nota por tecla). Joystick: toque numa direção e ela fica (↑ troca maior/menor · ↗ 7 · → maj7/m7 · ↘ 9 · ↓ sus4 · ↙ 6/sus2 · ← dim · ↖ aug); ● volta ao acorde base. No estilo Nota o joystick vira ↑↓ oitava e ←→ semitom. TOM − + e escala valem para o padrão; OIT e inversão, para o som. Arp: velocidade, ordem, ritmo (rit 1–6) e alcance em oitavas, no tempo do BPM</td></tr>
  <tr><td>prog</td><td>no teclado: toque em prog para o som atual conduzir a harmonia. Os outros sons de melodia transpõem as notas gravadas pelo acorde que ele está tocando (segue). Em outro som, o mesmo botão alterna segue / ignora / vira a PROG</td></tr>
+ <tr><td>Quant</td><td>bloco ao lado do swing: 1/16 = o REC ao vivo cai no passo mais perto · livre = guarda quanto você tocou fora da grade (vira o micro do passo, até meio passo para cada lado), no padrão e no Perf</td></tr>
  <tr><td>rept</td><td>repetição de nota: segure um pad e ele repete em 1/8, 1/16 ou 1/32 (gravando, se REC estiver ligado)</td></tr>
  <tr><td>borracha</td><td>com REC ligado, segure um pad: apaga aquela nota nos passos que passarem</td></tr>
  <tr><td>desfazer</td><td>volta a última volta gravada (até 8)</td></tr>
@@ -545,7 +547,7 @@ function migrate(s){
   for(const p of s.patterns){if(!PLEN.includes(p.len))p.len=16;if(!(p.key>=0&&p.key<12))p.key=0;if(!(p.sc>=0&&p.sc<SCALES.length))p.sc=0;if(!p.fx||typeof p.fx.p!=='object')p.fx={fx:true,m:false,p:{}};
     if(!Array.isArray(p.tr)||p.tr.length!==16)p.tr=Array.from({length:16},newTrilha);
     p.tr.forEach(t=>{if(!(t.c>=0&&t.c<=64))t.c=0;if(!(t.d>=0&&t.d<7))t.d=1;t.m=!!t.m;t.so=!!t.so;if(!t.p||typeof t.p!=='object')t.p={}})}
-  if(s.met===undefined)s.met=1;if(s.metVol===undefined)s.metVol=6;if(s.countIn===undefined)s.countIn=true;
+  if(s.rq!=='livre')s.rq='grade';if(s.met===undefined)s.met=1;if(s.metVol===undefined)s.metVol=6;if(s.countIn===undefined)s.countIn=true;
   if(!(s.rept>=0&&s.rept<4))s.rept=0;if(s.page===undefined)s.page=0;if(s.follow===undefined)s.follow=true;
   if(s.layAll===undefined)s.layAll=false;if(!(s.chopSens>=0&&s.chopSens<=1))s.chopSens=.5;if(!s.tex)s.tex={s:-1,vol:.6,f:1,frz:false};s.tex.frz=false;if(![4,8,16].includes(s.chopGrid))s.chopGrid=16;if(!s.mix)s.mix=MIXDEF();{const d=MIXDEF();for(const k in d)if(s.mix[k]===undefined)s.mix[k]=d[k]}
   for(const sl of s.instr||[]){if(!sl.ins)sl.ins={t:0,a:.5};if(sl.params){if(sl.params.rv==null)sl.params.rv=0;if(sl.params.ec==null)sl.params.ec=0}
@@ -1191,10 +1193,10 @@ function loopFire(tr,ti,s,x,t,pos,L){const dur=stepDur();
   const gate=s<8?(rat>1?ww*.9:stepGate(tr.tr[s],pos,x,dur,L)):0;
   x.k.forEach((k,j)=>{for(let r=0;r<rat;r++)trigger(s,k,tt+r*ww,{lock,fx,gain:gn(j)*(rat>1?Math.pow(.9,r):1),gate,tb})})}
 function recTrack(s){const T=S.loops,a=T[perfSel],live=t=>(t.st==='rec'||t.st==='ovd')&&t.inst===s;if(live(a))return a;return T.find(live)}
-function perfAdd(s,k,g){const t=recTrack(s);if(!t)return;let pos;
+function perfAdd(s,k,g,fr){const t=recTrack(s);if(!t)return;let pos;
   if(t.st==='rec'){pos=g-t.t0;if(pos<0){if(pos>=-1)pos=0;else return}if(pos>=128)return}
   else{const L=t.len*16;pos=((g-t.t0)%L+L)%L}
-  if(!addK(t,s,pos,k,1))return null;t.touched=true;dirty();return {p:t,s,ls:pos}}
+  if(!addK(t,s,pos,k,1))return null;if(fr!=null)setMi(t.tr[s].p[pos],fr,1);t.touched=true;dirty();return {p:t,s,ls:pos}}
 /* PERF › BPM loop: com tudo vazio e parado, o tempo entre dois toques na faixa define o loop e o BPM */
 let freeCap=null;
 const perfEmpty=()=>S.loops.every(t=>t.st==='empty'&&!t.len);
@@ -1203,7 +1205,7 @@ function freeBars(D){let best=null;for(const n of P2){const b=60*n*4/D;if(b>=70&
 function freeClose(){const fc=freeCap;freeCap=null;const D=ctx.currentTime-fc.t0;
   if(D<.4||!fc.ev.length){flash('LOOP LIVRE CANCELADO\ntoque notas entre os dois toques');return}
   const {n,bpm}=freeBars(D);S.bpm=bpm;const sd=stepDur(),L=n*16,t=S.loops[fc.i];Object.assign(t,newTrack(),keepT(t));
-  t.len=n;for(const [sl,k,tt] of fc.ev){const st=((Math.round((tt-fc.t0)/sd)%L)+L)%L;addK(t,sl,st,k,1)}
+  t.len=n;for(const [sl,k,tt] of fc.ev){const pf=(tt-fc.t0)/sd,st=((Math.round(pf)%L)+L)%L;addK(t,sl,st,k,1);setMi(t.tr[sl].p[st],pf,1)}
   t.layers=1;t.st='ovd';t.pass=trSnap(t);t.touched=false;S.perf.free=false;dirty();startPlay(false);
   flash(`LOOP LIVRE · ${n} COMP · ${bpm} BPM`,2600)}
 /* escolher a faixa já troca os pads/teclado para o som dela */
@@ -1256,7 +1258,9 @@ const outLat=()=>TST.fakeLat!=null?TST.fakeLat:ctx?(ctx.outputLatency||ctx.baseL
 const touchT=now=>now-outLat()-(DEV.latAdj||0)/1000;
 function nearest(at){if(!ctx&&at==null)return null;const now=at??touchT(ctx.currentTime);let best=null,bd=1e9;for(const e of sched){const d=Math.abs(e.time-now);if(d<bd){bd=d;best=e}}return best}
 function liveRec(k){const slot=S.curSound;S.instr[slot].lastKey=k;const vc=playNow(slot,k),t0=ctx.currentTime,best=nearest();
-  if(!best)return {vc,t0};const p=S.patterns[best.pat],posF=best.real+(touchT(ctx.currentTime)-best.time)/stepDur(),ls=locNear(p,slot,best.real,posF-best.real);if(addK(p,slot,ls,k))passTouched=true;dirty();return {vc,t0,loc:{p,s:slot,ls}}}
+  if(!best)return {vc,t0};const p=S.patterns[best.pat],posF=best.real+(touchT(ctx.currentTime)-best.time)/stepDur(),ls=locNear(p,slot,best.real,posF-best.real);if(addK(p,slot,ls,k))passTouched=true;setMi(p.tr[slot].p[ls],posF,p.tr[slot].d);dirty();return {vc,t0,loc:{p,s:slot,ls}}}
+/* QUANT livre: guarda quanto o toque saiu da grade (em passos de 1/16, ±0,5) como micro do passo */
+function setMi(x,posF,d){if(S.rq!=='livre'||!x)return;const f=DIVF[d??1],m=Math.round((posF-Math.round(posF*f)/f)*100)/100;if(Math.abs(m)>=.02)x.mi=Math.max(-.5,Math.min(.5,m));else delete x.mi}
 /* soltar: encerra a nota (synth) e grava quanto tempo ela ficou apertada (passo.du, só melodia) */
 function relH(h){if(!h||!ctx)return;const now=ctx.currentTime;if(h.vc&&h.vc.off)h.vc.off(now);if(h.vcs)h.vcs.forEach(v=>v&&v.off&&v.off(now));if(h.loc)setDu(h.loc,now-h.t0)}
 function setDu(loc,held){if(!loc||loc.s>=8||S.rept||held<.02)return;const T=loc.p.tr[loc.s],x=T&&T.p[loc.ls];if(!x||!x.k.length)return;
@@ -1532,7 +1536,7 @@ function padDown(k){ensureCtx();const cs=S.curSound,sl=S.instr[cs];
   if(calib){calibTap();return}
   switch(mode){
     case 'play':sl.lastKey=k;pressT[k]=ctx.currentTime;if(eraseOn&&liveRecOn&&playing)break;padH[k]=liveRecOn&&playing?liveRec(k):{vc:playNow(cs,k),t0:ctx.currentTime};break;
-    case 'perf':{sl.lastKey=k;pressT[k]=ctx.currentTime;const h={vc:playNow(cs,k,perfO(cs)),t0:ctx.currentTime};padH[k]=h;if(freeCap){freeCap.ev.push([cs,k,touchT(ctx.currentTime)]);break}const b=playing?nearest():null;if(b)h.loc=perfAdd(cs,k,b.g);break}
+    case 'perf':{sl.lastKey=k;pressT[k]=ctx.currentTime;const h={vc:playNow(cs,k,perfO(cs)),t0:ctx.currentTime};padH[k]=h;if(freeCap){freeCap.ev.push([cs,k,touchT(ctx.currentTime)]);break}const b=playing?nearest():null;if(b)h.loc=perfAdd(cs,k,b.g,(touchT(ctx.currentTime)-b.time)/stepDur());break}
     case 'steps':{if(S.layView)break;const st=viewPage()*16+k;if(st<sComp(ep(),S.curSound))stepEd?stepPick(st):toggleStep(st);break}
     case 'sound':if(texV){if(!samples[k]){flash('SOM VAZIO');break}const was=!!texN;if(was)texPlay();S.tex.s=k;S.tex.frz=false;dirty();if(was)texPlay();break}
       if(chopOn){if(chopTap){chopTapBtn();break}const m=chopMarks();if(k<m.length){chopSel=k;const [a,b]=chopRegion(k);playRegion(cs,a,b)}break}
@@ -1555,7 +1559,7 @@ function kbEv(b){const sl=S.instr[S.curSound],p=ep();
   if(sl.sty===3){let n=p.key+scN(p.sc,b)+12*sl.oct;if(nDir==='U')n+=12;if(nDir==='D')n-=12;if(nDir==='L')n--;if(nDir==='R')n++;return {notes:[n],name:noteName(n),roman:ROMAN[b]}}
   return kChord(b,kDir,p.key,p.sc,sl.inv,sl.oct)}
 function playNs(s,ns,strum,o={gate:.4}){ensureCtx();const t=ctx.currentTime+.005,g=++grpN;return ns.map((n,i)=>trigger(s,n,t+(strum?i*.045:0),{fx:heldFx,grp:g,...o}))}
-function liveRecNs(s,ns){const best=nearest();if(!best)return null;const p=S.patterns[best.pat],posF=best.real+(touchT(ctx.currentTime)-best.time)/stepDur(),ls=locNear(p,s,best.real,posF-best.real);if(addNs(p,s,ls,ns))passTouched=true;dirty();return {p,s,ls}}
+function liveRecNs(s,ns){const best=nearest();if(!best)return null;const p=S.patterns[best.pat],posF=best.real+(touchT(ctx.currentTime)-best.time)/stepDur(),ls=locNear(p,s,best.real,posF-best.real);if(addNs(p,s,ls,ns))passTouched=true;setMi(p.tr[s].p[ls],posF,p.tr[s].d);dirty();return {p,s,ls}}
 function kbDown(b){ensureCtx();if(calib){calibTap();return}
   const cs=S.curSound,sl=S.instr[cs];if(cs>=8)return;const ev=kbEv(b),ns=ev.notes;
   const H={notes:ns,t:ctx.currentTime,t0:ctx.currentTime};kbHeld.set(b,H);sl.lastCh=ns.slice();sl.lastKey=ns[0];
@@ -1565,7 +1569,7 @@ function kbDown(b){ensureCtx();if(calib){calibTap();return}
   if(sl.sty===2){arpK={s:cs,seq:arpSeq(ns),b};if(!playing){clearTimeout(arpTm);arpFree()}return}
   H.vcs=playNs(cs,ns,sl.sty===1,mode==='perf'?perfO(cs):{hold:true});
   if(mode==='play'&&liveRecOn&&playing)H.loc=liveRecNs(cs,ns);
-  if(mode==='perf'){if(freeCap){for(const n of ns)freeCap.ev.push([cs,n,touchT(ctx.currentTime)])}else{const bb=playing?nearest():null;if(bb)for(const n of ns)H.loc=perfAdd(cs,n,bb.g)||H.loc}}
+  if(mode==='perf'){if(freeCap){for(const n of ns)freeCap.ev.push([cs,n,touchT(ctx.currentTime)])}else{const bb=playing?nearest():null;if(bb)for(const n of ns)H.loc=perfAdd(cs,n,bb.g,(touchT(ctx.currentTime)-bb.time)/stepDur())||H.loc}}
   dirty()}
 function kbUp(b){const H=kbHeld.get(b);kbHeld.delete(b);if(arpK&&arpK.b===b){arpK=null;clearTimeout(arpTm);arpTm=null}relH(H)}
 function kbRelease(){for(let b=0;b<7;b++)if(kbDownEl[b]){kbDownEl[b]=false;kbUp(b)}}
@@ -1728,6 +1732,7 @@ function act(a){ensureCtx();const cs=S.curSound,sl=S.instr[cs];
     case 'bpm+':S.bpm=Math.min(240,S.bpm+1);dirty();break;
     case 'sw-':S.swing=Math.max(0,S.swing-5);dirty();break;
     case 'sw+':S.swing=Math.min(100,S.swing+5);dirty();break;
+    case 'rq':S.rq=S.rq==='livre'?'grade':'livre';dirty();flash(S.rq==='livre'?'QUANT LIVRE · O REC GUARDA O TEMPO DO TOQUE':'QUANT 1/16 · O REC CAI NO PASSO');break;
     case 'tap':{const t=performance.now();taps=taps.filter(x=>t-x<2500);taps.push(t);
       if(taps.length>=2){const iv=(taps[taps.length-1]-taps[0])/(taps.length-1);S.bpm=Math.round(Math.max(60,Math.min(240,60000/iv)));dirty();flash(`TAP ${S.bpm} BPM`)}else flash('TAP · CONTINUE TOCANDO');break}
     case 'rec':
@@ -2009,7 +2014,7 @@ function render(){
   setTxt($('dFx'),afx>=0?`FX ${FXS[afx]}${fxLatch&&heldFx>=0?' (TRAVADO)':''}`:'');
   setTxt($('dChain'),chainSteps(S.chain)>1||S.cenas[S.chain[0].c].l||pendingChain?`CADEIA ${chainTxt(pendingChain||S.chain)}${pendingChain?' (PRÓX.)':''}`:'');
   // controles
-  setTxt($('tBpm'),String(S.bpm));setTxt($('tSw'),S.swing+'%');
+  setTxt($('tBpm'),String(S.bpm));setTxt($('tSw'),S.swing+'%');setTxt($('tRq'),S.rq==='livre'?'livre':'1/16');
   $('modes').querySelectorAll('button').forEach(b=>setCls(b,b.dataset.mode===mode?'on':''));
   setHTML($('ctx'),ctxHTML());
   {const PG=curPages(),cp=curPage();setCls(document.querySelector('.params'),'params'+(PG.length>4?' p5':PG.length>3?' p4':''));setHTML($('pages'),PG.map((x,i)=>`<button data-page="${i}" class="${i===cp?'on':''}">${x.n}</button>`).join(''))}

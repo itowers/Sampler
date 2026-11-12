@@ -417,6 +417,19 @@ T['14.2 cenas guardam as faixas']=async()=>{const N='14.2 cenas guardam as faixa
   // cena antiga (só liga/desliga loops) continua igual
   E(`S.cenas.push({p:0,l:[false,true,true,true]});S.chain.push({c:S.cenas.length-1,x:1});chainPos=2;enterCena()`);if(!E('S.loops[0].mute'))bad.push('cena antiga não mutou');
   rec(N,!bad.length,bad.length?bad.join(' · '):'+cena guarda cópia das 4 faixas · a cadeia troca as faixas na virada · o que mudou numa cena fica nela · cena antiga só liga e desliga loops')};
+/* ---------- QUANT livre ---------- */
+T['15.1 QUANT livre']=async()=>{const N='15.1 QUANT livre',bad=[];
+  reset();const d=E('ensureCtx();S.bpm=120;S.swing=0;stepDur()');
+  E(`TST.fakeLat=0;DEV.latAdj=0;S.patterns[0]=newPattern();S.curPattern=0;S.rq='livre';const n=ctx.currentTime;sched=[];for(let i=0;i<8;i++)sched.push({time:n+(i-4)*${d}-.3*${d},real:i,step:i,pat:0,g:i,dice:{}});
+    liveRecNs(0,[0]);S.rq='grade';sched=[];for(let i=0;i<8;i++)sched.push({time:n+(i-4)*${d}+.25*${d},real:i,step:i,pat:0,g:i,dice:{}});liveRecNs(1,[0]);TST.fakeLat=null;sched=[]`);
+  const a=E(`[S.patterns[0].tr[0].p[4]&&S.patterns[0].tr[0].p[4].mi,S.patterns[0].tr[1].p[4]&&('mi' in S.patterns[0].tr[1].p[4])]`);
+  if(!(Math.abs(a[0]-.3)<.011&&a[1]===false))bad.push('padrão '+JSON.stringify(a));
+  E(`S.loops=newLoops();Object.assign(S.loops[0],{st:'ovd',len:1,t0:0,layers:1});perfSel=0;S.rq='livre';perfAdd(8,0,3,-.2);S.rq='grade';perfAdd(8,1,5,.2)`);
+  const b=E(`[S.loops[0].tr[8].p[3].mi,'mi' in S.loops[0].tr[8].p[5]]`);if(!(b[0]===-.2&&b[1]===false))bad.push('perf '+JSON.stringify(b));
+  const r=await render({steps:16,dry:true}),ev=r.ev.find(e=>e.s===0);if(!ev||Math.abs((ev.t-r.t0)/d-4.3)>.011)bad.push('tocou em '+(ev&&((ev.t-r.t0)/d).toFixed(2)));
+  E(`S.rq='grade'`);
+  rec(N,!bad.length,bad.length?bad.join(' · '):'livre: toque 0,3 passo depois grava micro +30% e toca em 4,3 · 1/16 grava no passo, sem micro · Perf livre guarda −20%')};
+PERSIST.push(['quant livre',`S.rq='livre'`,`S.rq==='livre'`]);
 PERSIST.push(['faixas do Perf',`Object.assign(S.loops[2],{inst:5,fx:{v:.5,p:.3,f:.2,d:.4,r:.6,e:.1}})`,`S.loops[2].inst===5&&S.loops[2].fx.d===.4&&S.loops[2].fx.e===.1&&S.loops[2].fx.p===.3`]);
 PERSIST.push(['synth e espaço',`S.instr[5]=synSlot('m',30,'vib',{rv:.4,ec:.2});S.instr[13]=synSlot('k',6,'tec');S.instr[13].kp={3:[.2,.8]};S.mix.ef=.5;S.mix.et=1;addK(S.patterns[2],5,4,7);TL(S.patterns[2],5,4,{du:2.5})`,
   `S.instr[5].syn.id===30&&S.instr[5].params.rv===.4&&S.instr[5].params.ec===.2&&S.instr[13].syn.t==='k'&&S.instr[13].kp[3][1]===.8&&S.mix.ef===.5&&S.mix.et===1&&S.patterns[2].tr[5].p[4].du===2.5`]);
